@@ -34,6 +34,13 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.18.3
+  app_links: ^7.2.2
+  image_picker: ^1.2.4
+  mobile_scanner: ^7.4.3
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  geolocator: ^14.1.2
 
 dev_dependencies:
   flutter_test:
@@ -57,33 +64,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
-
-  # An image asset can refer to one or more resolution-specific "variants", see
-  # https://flutter.dev/to/resolution-aware-images
-
-  # For details regarding adding assets from package dependencies, see
-  # https://flutter.dev/to/asset-from-package
-
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  assets:
+    - assets/imagenes/fondo_autenticacion.png
+    - assets/imagenes/logo_patitas.png
+    - assets/imagenes/ilustracion_perro_gato.png
+    - assets/imagenes/ilustracion_campus_espoch.png
+    - assets/imagenes/decoracion_hojas_izquierda.png
+    - assets/imagenes/decoracion_hojas_derecha.png
+    - assets/imagenes/ilustracion_inicio_cuidemos.png
+    - assets/imagenes/ilustracion_inicio_personal_autorizado.png
+    - assets/imagenes/estado_pendiente.png

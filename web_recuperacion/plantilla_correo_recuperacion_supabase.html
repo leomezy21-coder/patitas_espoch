@@ -1,0 +1,50 @@
+<!--
+  Plantilla HTML para Supabase Dashboard -> Authentication -> Email Templates -> Reset Password
+  Configuracion oficial de Patitas ESPOCH:
+  - Site URL en Supabase: patitasespoch://restablecer/
+  - Pagina publica de recuperacion (Firebase Hosting, proyecto patitas-espoch):
+    https://patitas-espoch.web.app/
+  - Enlace de restablecimiento con TokenHash:
+    https://patitas-espoch.web.app/?token_hash={{ .TokenHash }}&type=recovery
+  Asunto sugerido: Restablecer contraseña institucional — Patitas ESPOCH
+-->
+<div style="font-family: Arial, Helvetica, sans-serif; background-color: #F7F9FA; padding: 24px; color: #1F2937;">
+  <div style="max-width: 520px; margin: 0 auto; background-color: #FFFFFF; border: 1px solid #D0D7DE; border-radius: 12px; padding: 28px;">
+    <h2 style="color: #1E6B52; margin-top: 0; margin-bottom: 8px;">Patitas ESPOCH</h2>
+    <p style="font-size: 13px; color: #2C4A6F; font-weight: bold; margin-top: 0; margin-bottom: 20px;">
+      Campus Matriz — Riobamba
+    </p>
+
+    <h3 style="font-size: 18px; color: #1F2937; margin-bottom: 12px;">
+      Solicitud de restablecimiento de contraseña
+    </h3>
+
+    <p style="font-size: 14px; line-height: 1.5; color: #4B5563;">
+      Recibimos una solicitud para cambiar la contraseña de tu cuenta institucional asociada a
+      <strong>{{ .Email }}</strong> en la aplicación móvil <strong>Patitas ESPOCH</strong>.
+    </p>
+
+    <p style="font-size: 14px; line-height: 1.5; color: #4B5563;">
+      Haz clic en el siguiente botón para abrir la página web de restablecimiento y definir tu nueva contraseña:
+    </p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a
+        href="https://patitas-espoch.web.app/?token_hash={{ .TokenHash }}&type=recovery"
+        style="background-color: #1E6B52; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;"
+      >
+        Restablecer contraseña
+      </a>
+    </p>
+
+    <p style="font-size: 12px; line-height: 1.5; color: #4B5563;">
+      Por seguridad, este enlace es de un solo uso y tiene vigencia limitada. Una vez actualizada tu contraseña en el navegador, regresa a la aplicación móvil Patitas ESPOCH e inicia sesión con tu nueva clave.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #D0D7DE; margin: 20px 0;">
+
+    <p style="font-size: 12px; color: #4B5563; margin-bottom: 0;">
+      Si no solicitaste este cambio, puedes ignorar este mensaje; tu contraseña actual permanecerá sin modificaciones.
+    </p>
+  </div>
+</div>

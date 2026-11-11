@@ -46,3 +46,24 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Configuracion local de Supabase y cache de Firebase CLI (no incluir en control de versiones)
+configuracion_supabase.json
+web_recuperacion/configuracion_web.js
+.firebase/
+web_recuperacion/configuracion_web.js
+
+
+# Credenciales y configuraciones privadas
+.env
+.env.*
+*.jks
+*.keystore
+/android/key.properties
+*service-account*.json
+
+# Archivos temporales de Supabase
+/supabase/.temp/
+
+# Referencias graficas pesadas
+/documentacion/referencias_diseno/

@@ -1,122 +1,153 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-void main() {
-  runApp(const MyApp());
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'pantallas/pantalla_bienvenida.dart';
+import 'pantallas/pantalla_nueva_contrasena.dart';
+import 'pantallas/pantalla_principal_general.dart';
+import 'servicios/configuracion_supabase.dart';
+import 'servicios/servicio_autenticacion.dart';
+import 'tema/tema_patitas.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa el cliente de Supabase. El SDK gestiona internamente la recepcion
+  // de enlaces profundos (PKCE) mediante su propio observador de AppLinks.
+  await ConfiguracionSupabase.inicializar();
+
+  runApp(const AplicacionPatitasEspoch());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Aplicacion principal de Patitas ESPOCH.
+/// Actua como punto central de navegacion segun el estado de sesion y de
+/// recuperacion de contrasena reportado por ServicioAutenticacion.
+class AplicacionPatitasEspoch extends StatefulWidget {
+  const AplicacionPatitasEspoch({super.key});
 
-  // This widget is the root of your application.
+  @override
+  State<AplicacionPatitasEspoch> createState() =>
+      _AplicacionPatitasEspochEstado();
+}
+
+class _AplicacionPatitasEspochEstado extends State<AplicacionPatitasEspoch> {
+  final GlobalKey<NavigatorState> _llaveNavegador = GlobalKey<NavigatorState>();
+  final GlobalKey<ScaffoldMessengerState> _llaveMensajero =
+      GlobalKey<ScaffoldMessengerState>();
+
+  StreamSubscription<bool>? _suscripcionRecuperacion;
+  StreamSubscription<bool>? _suscripcionSesion;
+  StreamSubscription<AuthState>? _suscripcionEventosAuth;
+
+  late bool _enModoRecuperacion;
+  late bool _tieneSesionActiva;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _enModoRecuperacion = ServicioAutenticacion.tieneSesionRecuperacionActiva;
+    _tieneSesionActiva =
+        !_enModoRecuperacion && ServicioAutenticacion.tieneSesionActiva;
+
+    // Prioriza el flujo de recuperacion de contrasena (AuthChangeEvent.passwordRecovery)
+    // para que la navegacion normal de sesion nunca lo sustituya por PantallaPrincipalGeneral.
+    _suscripcionRecuperacion = ServicioAutenticacion.cambiosModoRecuperacion
+        .listen(_actualizarModoRecuperacion, onError: (_) {});
+
+    // Escucha cambios de sesion general (inicio, restauracion y cierre de sesion).
+    _suscripcionSesion = ServicioAutenticacion.cambiosSesionActiva.listen(
+      _actualizarEstadoSesion,
+      onError: (_) {},
+    );
+
+    // Captura errores del intercambio PKCE (por ejemplo, enlaces expirados o ya usados)
+    // sin registrar enlaces completos ni tokens.
+    _suscripcionEventosAuth = ServicioAutenticacion.cambiosEstadoAutenticacion
+        ?.listen(
+          (AuthState estado) {
+            if (estado.event == AuthChangeEvent.passwordRecovery &&
+                estado.session != null &&
+                !estado.session!.isExpired) {
+              _actualizarModoRecuperacion(true);
+            }
+          },
+          onError: (Object error, StackTrace traza) {
+            if (!mounted) return;
+            if (error is AuthException) {
+              final mensaje = ServicioAutenticacion.traducirErrorAuth(error);
+              _llaveMensajero.currentState
+                ?..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(content: Text(mensaje)));
+            }
+          },
+        );
+  }
+
+  /// Activa la vista de restablecimiento de contrasena cuando llega un evento valido de recuperacion.
+  void _actualizarModoRecuperacion(bool activarRecuperacion) {
+    if (!mounted) return;
+
+    if (activarRecuperacion) {
+      if (_enModoRecuperacion) return;
+      setState(() {
+        _enModoRecuperacion = true;
+        _tieneSesionActiva = false;
+      });
+      _llaveNavegador.currentState?.popUntil((ruta) => ruta.isFirst);
+    }
+  }
+
+  /// Finaliza el modo de recuperacion tras guardar la nueva contrasena o cancelar el flujo.
+  void _finalizarModoRecuperacion() {
+    if (!mounted) return;
+    setState(() {
+      _enModoRecuperacion = false;
+      _tieneSesionActiva = ServicioAutenticacion.tieneSesionActiva;
+    });
+    _llaveNavegador.currentState?.popUntil((ruta) => ruta.isFirst);
+  }
+
+  /// Actualiza la pantalla segun la sesion general activa, respetando el bloqueo de recuperacion.
+  void _actualizarEstadoSesion(bool sesionActiva) {
+    if (!mounted) return;
+
+    // Mientras el usuario establece su nueva contrasena, no se permite conmutar a PantallaPrincipalGeneral.
+    if (_enModoRecuperacion) return;
+
+    if (_tieneSesionActiva == sesionActiva) return;
+
+    setState(() {
+      _tieneSesionActiva = sesionActiva;
+    });
+
+    _llaveNavegador.currentState?.popUntil((ruta) => ruta.isFirst);
+  }
+
+  @override
+  void dispose() {
+    _suscripcionRecuperacion?.cancel();
+    _suscripcionSesion?.cancel();
+    _suscripcionEventosAuth?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+      title: 'Patitas ESPOCH',
+      navigatorKey: _llaveNavegador,
+      scaffoldMessengerKey: _llaveMensajero,
+      debugShowCheckedModeBanner: false,
+      theme: TemaPatitas.obtenerTemaClaro(),
+      home: _enModoRecuperacion
+          ? PantallaNuevaContrasena(
+              alFinalizarRecuperacion: _finalizarModoRecuperacion,
+            )
+          : (_tieneSesionActiva
+                ? const PantallaPrincipalGeneral()
+                : const PantallaBienvenida()),
     );
   }
 }

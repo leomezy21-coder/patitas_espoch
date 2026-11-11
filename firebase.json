@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "web_recuperacion",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

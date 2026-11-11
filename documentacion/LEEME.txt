@@ -1,0 +1,10 @@
+KIT DE INICIO PARA ANTIGRAVITY — PATITAS ESPOCH (22-10-2026)
+
+CONTENIDO DEL ZIP:
+- 01_PROMPT_MAESTRO_ANTIGRAVITY.md: texto completo para pegar en el chat de Antigravity.
+- AGENTS.md: reglas persistentes; colocar en la raiz del repositorio Flutter.
+- 02_INVENTARIO_Y_ADVERTENCIAS.md: archivos originales identificados, jerarquia y conflictos.
+
+IMPORTANTE: El ZIP NO CONTIENE LOS DOCUMENTOS ORIGINALES de la biblioteca. No fue posible materializar/exportar sus bytes aqui. Recuperalos desde los accesos a archivos presentados en la respuesta de ChatGPT y agregalos a documentacion/ en tu equipo.
+
+PRIMERA EJECUCION: no autorices cambios automaticos hasta revisar el diagnostico y plan de Antigravity.
