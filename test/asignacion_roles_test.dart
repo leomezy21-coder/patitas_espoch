@@ -302,6 +302,38 @@ void main() {
     );
   });
 
+  testWidgets('Oculta cuentas inactivas y conserva las cuentas activas', (
+    tester,
+  ) async {
+    final proveedor = ProveedorRolesMemoria();
+    proveedor.usuarios = [
+      UsuarioAdministracionModelo.desdeServidor(datos()),
+      UsuarioAdministracionModelo.desdeServidor({
+        ...datos(id: '33333333-3333-4333-8333-333333333333'),
+        'correo': 'inactiva@espoch.edu.ec',
+        'activo': false,
+      }),
+    ];
+    ServicioRoles.configurarProveedorPrueba(proveedor);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PantallaAsignacionRoles(perfil: perfil(RolUsuario.administrador)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('destino@espoch.edu.ec'), findsOneWidget);
+    expect(find.text('inactiva@espoch.edu.ec'), findsNothing);
+    expect(
+      find.byKey(
+        const ValueKey('cambiar_rol_33333333-3333-4333-8333-333333333333'),
+      ),
+      findsNothing,
+    );
+    expect(proveedor.usuarios.length, 2);
+    expect(proveedor.escrituras, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Respuesta de busqueda anterior no reemplaza la consulta reciente',
     (tester) async {

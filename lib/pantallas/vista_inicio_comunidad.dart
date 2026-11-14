@@ -1038,102 +1038,23 @@ class _PanelInicioAdministrador extends StatelessWidget {
   }
 
   Widget _construirBannerIlustradoAdministrador() {
-    return Container(
-      key: const ValueKey('banner_inicio_administrador'),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF6E6),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            color: TemaPatitas.colorSombraCalida,
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: AspectRatio(
-          aspectRatio: 1672 / 941,
-          child: LayoutBuilder(
-            builder: (contexto, limites) {
-              final ancho = limites.maxWidth;
-              final alto = limites.maxHeight;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(
-                    'assets/imagenes/ilustracion_inicio_personal_autorizado.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (contexto, error, traza) =>
-                        const ColoredBox(color: Color(0xFFFCF3DE)),
-                  ),
-                  // Cubre el texto de personal autorizado conservando las chispas verdes y las mascotas
-                  Positioned(
-                    left: ancho * 0.055,
-                    top: alto * 0.38,
-                    width: ancho * 0.43,
-                    height: alto * 0.14,
-                    child: const ColoredBox(color: Color(0xFFFCF3DE)),
-                  ),
-                  Positioned(
-                    left: ancho * 0.055,
-                    top: alto * 0.50,
-                    width: ancho * 0.47,
-                    height: alto * 0.24,
-                    child: const ColoredBox(color: Color(0xFFFCF3DE)),
-                  ),
-                  Positioned(
-                    left: ancho * 0.065,
-                    top: alto * 0.39,
-                    width: ancho * 0.455,
-                    height: alto * 0.34,
-                    child: Stack(
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text.rich(
-                              const TextSpan(
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF3E1F04),
-                                  height: 1.15,
-                                ),
-                                children: [
-                                  TextSpan(
-                                    text: 'Administra la información\npara ',
-                                  ),
-                                  TextSpan(
-                                    text: 'cuidar a nuestros\nanimalitos.',
-                                    style: TextStyle(color: Color(0xFFF36B1C)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: ancho * 0.03,
-                          bottom: 0,
-                          child: Transform.rotate(
-                            angle: -0.15,
-                            child: Icon(
-                              Icons.pets_rounded,
-                              size: (ancho * 0.055).clamp(16.0, 26.0),
-                              color: const Color(0xFFF4C587),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
+    return Semantics(
+      label: 'Administra la información para cuidar a nuestros animalitos.',
+      image: true,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 120, maxWidth: 520),
+          child: Image.asset(
+            'assets/imagenes/administrador/banner_inicio_administrador.png',
+            key: const ValueKey('banner_inicio_administrador'),
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+            errorBuilder: (_, error, traza) => const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Administra la información para cuidar a nuestros animalitos.',
+              ),
+            ),
           ),
         ),
       ),
@@ -1143,7 +1064,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
   Widget _construirBloqueAdministrador(BuildContext context) {
     return Container(
       key: const ValueKey('seccion_admin_administrador'),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF6E7CE),
         borderRadius: BorderRadius.circular(22),
@@ -1167,20 +1088,89 @@ class _PanelInicioAdministrador extends StatelessWidget {
               color: TemaPatitas.colorMarronOscuro,
             ),
           ),
-          const SizedBox(height: 10),
-          _TarjetaResumenPersonalAutorizado(
-            key: const ValueKey('tarjeta_admin_asignacion_roles'),
-            titulo: 'Asignación de roles',
-            subtitulo: 'Gestiona y asigna roles de usuario',
-            icono: Icons.manage_accounts_outlined,
-            colorFondoIcono: const Color(0xFFF8ABA6),
-            colorIcono: const Color(0xFF6B0909),
-            colorBorde: const Color(0xFFEA1D24),
-            colorFondoTarjeta: const Color(0xFFFAF2E8),
-            habilitada: perfil.activo,
-            permitirCrecimientoVertical: true,
-            alPresionar: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => PantallaAsignacionRoles(perfil: perfil)),
+          const SizedBox(height: 6),
+          Semantics(
+            label: 'Asignación de roles. Gestiona y asigna roles de usuario',
+            button: true,
+            enabled: perfil.activo,
+            child: Material(
+              color: const Color(0xFFFAF2E8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: const BorderSide(color: Color(0xFFEA1D24), width: 1.6),
+              ),
+              child: InkWell(
+                key: const ValueKey('tarjeta_admin_asignacion_roles'),
+                borderRadius: BorderRadius.circular(18),
+                onTap: !perfil.activo
+                    ? null
+                    : () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PantallaAsignacionRoles(perfil: perfil),
+                        ),
+                      ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 80),
+                  child: ExcludeSemantics(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8ABA6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.manage_accounts_outlined,
+                              size: 27,
+                              color: Color(0xFF6B0909),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Asignación de roles',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: TemaPatitas.colorMarronOscuro,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'Gestiona y asigna roles de usuario',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.25,
+                                    color: TemaPatitas.colorTextoSecundario,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 25,
+                            color: Color(0xFF9E1515),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -1386,8 +1376,8 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
   final IconData icono;
   final Color colorFondoIcono;
   final Color colorIcono;
-  final Color colorBorde;
-  final Color colorFondoTarjeta;
+  final Color colorBorde = const Color(0xFFF3C38F);
+  final Color colorFondoTarjeta = const Color(0xFFFFFBF5);
   final int? contadorReal;
   final bool cargando;
   final bool habilitada;
@@ -1402,8 +1392,6 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
     required this.icono,
     required this.colorFondoIcono,
     required this.colorIcono,
-    this.colorBorde = const Color(0xFFF3C38F),
-    this.colorFondoTarjeta = const Color(0xFFFFFBF5),
     this.contadorReal,
     this.cargando = false,
     required this.habilitada,

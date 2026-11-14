@@ -169,7 +169,7 @@ class EtiquetaAnimalPatitas extends StatelessWidget {
   }
 }
 
-/// Usa exactamente la insignia adjunta; el texto accesible no depende del PNG.
+/// Presenta estados con texto accesible y una insignia pendiente compacta.
 class InsigniaEstadoAnimal extends StatelessWidget {
   final AnimalModelo animal;
   const InsigniaEstadoAnimal({super.key, required this.animal});
@@ -179,15 +179,29 @@ class InsigniaEstadoAnimal extends StatelessWidget {
     if (estado == 'pendiente') {
       return Semantics(
         label: 'Estado general: Pendiente',
-        image: true,
         child: ExcludeSemantics(
-          child: Image.asset(
-            'assets/imagenes/estado_pendiente.png',
-            width: 180,
-            fit: BoxFit.contain,
-            errorBuilder: (_, error, traza) => const Chip(
-              avatar: Icon(Icons.schedule),
-              label: Text('Pendiente'),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8CD),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule, size: 17, color: Color(0xFF9A6500)),
+                SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    'Pendiente',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF9A6500),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

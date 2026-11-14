@@ -780,7 +780,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Administrador'), findsOneWidget);
-      expect(find.text('Asignación de roles'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('tarjeta_admin_asignacion_roles')),
+        findsOneWidget,
+      );
       expect(find.text('Personal autorizado'), findsOneWidget);
       expect(find.text('Usuario'), findsOneWidget);
       expect(find.text('Fichas pendientes'), findsOneWidget);

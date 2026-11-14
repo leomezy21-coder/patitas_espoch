@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../modelos/perfil_usuario_modelo.dart';
 import '../modelos/usuario_administracion_modelo.dart';
 import '../servicios/servicio_roles.dart';
+import '../tema/tema_patitas.dart';
 
 class PantallaAsignacionRoles extends StatefulWidget {
   final PerfilUsuarioModelo perfil;
@@ -17,6 +18,9 @@ class _PantallaAsignacionRolesEstado extends State<PantallaAsignacionRoles> {
   List<UsuarioAdministracionModelo> _usuarios = [];
   String? _error;
   String? _aviso;
+  // Ocultar perfiles inactivos sin eliminarlos ni modificar las paginas del servidor.
+  List<UsuarioAdministracionModelo> get _usuariosVisibles =>
+      _usuarios.where((usuario) => usuario.activo).toList();
   bool _cargando = false;
   bool _guardando = false;
   int _pagina = 0;
@@ -180,7 +184,12 @@ class _PantallaAsignacionRolesEstado extends State<PantallaAsignacionRoles> {
     return PopScope(
       canPop: !_guardando,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Asignación de roles')),
+        backgroundColor: TemaPatitas.colorCremaFondo,
+        appBar: AppBar(
+          title: const Text('Asignación de roles'),
+          backgroundColor: TemaPatitas.colorCremaFondo,
+          foregroundColor: TemaPatitas.colorMarronOscuro,
+        ),
         body: !_autorizado
             ? const Center(
                 child: Text(
@@ -188,102 +197,120 @@ class _PantallaAsignacionRolesEstado extends State<PantallaAsignacionRoles> {
                 ),
               )
             : SafeArea(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    const Text(
-                      'Usuarios institucionales',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Image.asset(
+                      'assets/imagenes/fondo_autenticacion.png',
+                      fit: BoxFit.cover,
+                      excludeFromSemantics: true,
+                      errorBuilder: (_, error, traza) =>
+                          const SizedBox.shrink(),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Busca por correo y asigna un rol. Tu propio rol y las cuentas inactivas no se pueden modificar desde este módulo.',
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _busqueda,
-                      enabled: !_guardando,
-                      key: const ValueKey('buscar_usuario_rol'),
-                      maxLength: 150,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _buscar(),
-                      decoration: InputDecoration(
-                        labelText: 'Buscar por correo institucional',
-                        suffixIcon: IconButton(
-                          tooltip: 'Buscar usuarios',
-                          onPressed: _guardando ? null : _buscar,
-                          icon: const Icon(Icons.search),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: ListView(
+                          padding: const EdgeInsets.all(20),
+                          children: [
+                            const Text(
+                              'Usuarios institucionales',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Busca por correo y asigna un rol. Se muestran únicamente cuentas activas. Tu propio rol no se puede modificar desde este módulo.',
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _busqueda,
+                              enabled: !_guardando,
+                              key: const ValueKey('buscar_usuario_rol'),
+                              maxLength: 150,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (_) => _buscar(),
+                              decoration: InputDecoration(
+                                labelText: 'Buscar por correo institucional',
+                                suffixIcon: IconButton(
+                                  tooltip: 'Buscar usuarios',
+                                  onPressed: _guardando ? null : _buscar,
+                                  icon: const Icon(Icons.search),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _guardando || _cargando
+                                    ? null
+                                    : () => _cargar(),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Actualizar lista'),
+                              ),
+                            ),
+                            if (_aviso != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  _aviso!,
+                                  key: const ValueKey('aviso_roles'),
+                                ),
+                              ),
+                            if (_guardando)
+                              const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: LinearProgressIndicator(),
+                              ),
+                            if (_cargando)
+                              const Center(child: CircularProgressIndicator())
+                            else if (_error != null) ...[
+                              Text(_error!, key: const ValueKey('error_roles')),
+                              TextButton(
+                                onPressed: () => _cargar(),
+                                child: const Text('Reintentar'),
+                              ),
+                            ] else ...[
+                              if (_usuariosVisibles.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: Text(
+                                    'No se encontraron usuarios para esta búsqueda.',
+                                  ),
+                                ),
+                              for (final usuario in _usuariosVisibles)
+                                _tarjeta(usuario),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 16,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  TextButton(
+                                    onPressed: _guardando || _pagina == 0
+                                        ? null
+                                        : () => _cargar(pagina: _pagina - 1),
+                                    child: const Text('Anterior'),
+                                  ),
+                                  Text('Página ${_pagina + 1}'),
+                                  TextButton(
+                                    onPressed:
+                                        _guardando ||
+                                            _usuarios.length <
+                                                ServicioRoles.tamanoPagina
+                                        ? null
+                                        : () => _cargar(pagina: _pagina + 1),
+                                    child: const Text('Siguiente'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: _guardando || _cargando
-                            ? null
-                            : () => _cargar(),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Actualizar lista'),
-                      ),
-                    ),
-                    if (_aviso != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          _aviso!,
-                          key: const ValueKey('aviso_roles'),
-                        ),
-                      ),
-                    if (_guardando)
-                      const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: LinearProgressIndicator(),
-                      ),
-                    if (_cargando)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_error != null) ...[
-                      Text(_error!, key: const ValueKey('error_roles')),
-                      TextButton(
-                        onPressed: () => _cargar(),
-                        child: const Text('Reintentar'),
-                      ),
-                    ] else ...[
-                      if (_usuarios.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Text(
-                            'No se encontraron usuarios para esta búsqueda.',
-                          ),
-                        ),
-                      for (final usuario in _usuarios) _tarjeta(usuario),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 16,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          TextButton(
-                            onPressed: _guardando || _pagina == 0
-                                ? null
-                                : () => _cargar(pagina: _pagina - 1),
-                            child: const Text('Anterior'),
-                          ),
-                          Text('Página ${_pagina + 1}'),
-                          TextButton(
-                            onPressed:
-                                _guardando ||
-                                    _usuarios.length <
-                                        ServicioRoles.tamanoPagina
-                                ? null
-                                : () => _cargar(pagina: _pagina + 1),
-                            child: const Text('Siguiente'),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -293,32 +320,113 @@ class _PantallaAsignacionRolesEstado extends State<PantallaAsignacionRoles> {
 
   Widget _tarjeta(UsuarioAdministracionModelo usuario) {
     final propio = usuario.idUsuario == widget.perfil.idUsuario;
+    final habilitado = !_guardando && !propio && usuario.activo;
+    final colorRol = usuario.rol == RolUsuario.administrador
+        ? TemaPatitas.colorAzulPolitecnico
+        : usuario.rol == RolUsuario.personalAutorizado
+        ? TemaPatitas.colorVerdeEsmeralda
+        : TemaPatitas.colorMarronOscuro;
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      color: usuario.activo ? const Color(0xFFE4D0B9) : const Color(0xFFEEEAE4),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              usuario.nombreVisible,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Image.asset(
+                  'assets/imagenes/administrador/avatar_usuario.png',
+                  width: 34,
+                  height: 34,
+                  excludeFromSemantics: true,
+                  errorBuilder: (_, error, traza) => const Icon(
+                    Icons.account_circle,
+                    size: 34,
+                    color: TemaPatitas.colorMarronOscuro,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        usuario.nombreVisible,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: TemaPatitas.colorMarronOscuro,
+                        ),
+                      ),
+                      Text(
+                        usuario.correo,
+                        softWrap: true,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      if (propio)
+                        const Text('Tu cuenta', style: TextStyle(fontSize: 12))
+                      else if (!usuario.activo)
+                        const Text(
+                          'Cuenta inactiva',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Text(usuario.correo),
-            Text('Rol: ${usuario.rol.etiquetaVisible}'),
-            if (propio)
-              const Text('Tu cuenta')
-            else if (!usuario.activo)
-              const Text('Cuenta inactiva'),
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton(
-                key: ValueKey('cambiar_rol_${usuario.idUsuario}'),
-                onPressed: _guardando || propio || !usuario.activo
-                    ? null
-                    : () => _editar(usuario),
-                child: const Text('Cambiar rol'),
-              ),
+            const SizedBox(height: 8),
+            // Wrap conserva textos completos al ampliar la fuente: nunca fuerza dos columnas.
+            Wrap(
+              spacing: 10,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorRol.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Rol: ${usuario.rol.etiquetaVisible}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colorRol,
+                    ),
+                  ),
+                ),
+                OutlinedButton(
+                  key: ValueKey('cambiar_rol_${usuario.idUsuario}'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: TemaPatitas.colorNaranjaPrimario,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFFF1E5D6),
+                    minimumSize: const Size(112, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    side: BorderSide.none,
+                  ),
+                  onPressed: habilitado ? () => _editar(usuario) : null,
+                  child: const Text('Cambiar rol'),
+                ),
+              ],
             ),
           ],
         ),
