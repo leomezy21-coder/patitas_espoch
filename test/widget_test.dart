@@ -787,9 +787,8 @@ void main() {
       expect(find.text('Incidencias activas'), findsOneWidget);
       expect(find.text('Próximas vacunas'), findsOneWidget);
       expect(find.text('Reevaluaciones'), findsOneWidget);
-      // 5 accesos pendientes deshabilitados: Asignación de roles, Incidencias activas,
-      // Próximas vacunas, Reevaluaciones y Reportar incidencia.
-      expect(find.text('Próximamente'), findsNWidgets(5));
+      // 4 accesos pendientes: incidencias, vacunas, reevaluaciones y reporte.
+      expect(find.text('Próximamente'), findsNWidgets(4));
     },
   );
 

@@ -39,7 +39,7 @@ void main() {
   testWidgets('Muestra dentro, fuera y pendiente sin convertir un estado en otro', (tester) async {
     for (final caso in <(bool?, String, String)>[
       (true, 'dentro', 'Dentro del campus matriz'),
-      (false, 'fuera', 'Fuera del campus matriz'),
+      (false, 'fuera', 'Fuera de las áreas delimitadas'),
       (null, 'pendiente', 'Validación del campus pendiente'),
     ]) {
       await tester.pumpWidget(MaterialApp(

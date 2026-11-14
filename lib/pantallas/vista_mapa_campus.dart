@@ -10,6 +10,8 @@ import '../servicios/servicio_ubicacion_campus.dart';
 import '../tema/tema_patitas.dart';
 import '../componentes/avistamientos_recientes.dart';
 import '../modelos/avistamiento_modelo.dart';
+import '../modelos/geocerca_modelo.dart';
+import '../servicios/servicio_geocercas.dart';
 import 'pantalla_detalle_avistamiento.dart';
 
 /// Vista interactiva del Mapa del Campus Matriz de la ESPOCH (Etapa 4).
@@ -27,7 +29,7 @@ import 'pantalla_detalle_avistamiento.dart';
 ///   servicio desactivado, tiempo de espera y errores sin seguimiento en
 ///   segundo plano.
 /// - Consulta los reportes recientes y muestra el ultimo por animal.
-///   Las geocercas permanecen pendientes de validacion.
+///   Consulta los perímetros y sectores activos de Matriz y del área delimitada de Tunshi.
 class VistaMapaCampus extends StatefulWidget {
   final PerfilUsuarioModelo perfil;
 
@@ -56,6 +58,103 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
   bool _errorCargaTeselas = false;
 
   List<AvistamientoModelo> _avistamientos = [];
+  List<GeocercaModelo> _geocercas = [];
+  String _sede = 'matriz';
+  String? _errorGeocercas;
+  bool _cargandoGeocercas = true;
+  bool _mostrarSectores = true;
+  GeocercaModelo? get _campusSeleccionado {
+    for (final zona in _geocercas) {
+      if (zona.esCampus && zona.sede == _sede) return zona;
+    }
+    return null;
+  }
+
+  LatLng get _centroSeleccionado {
+    final centro = _campusSeleccionado?.centro;
+    return centro == null
+        ? ServicioUbicacionCampus.centroCampusMatriz
+        : LatLng(centro.latitud, centro.longitud);
+  }
+
+  Future<void> _cargarGeocercas() async {
+    setState(() {
+      _cargandoGeocercas = true;
+      _errorGeocercas = null;
+    });
+    try {
+      final zonas = await ServicioGeocercas.proveedor.listar();
+      if (mounted) setState(() => _geocercas = zonas);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _errorGeocercas = ServicioGeocercas.mensajeError(error));
+      }
+    } finally {
+      if (mounted) setState(() => _cargandoGeocercas = false);
+    }
+  }
+
+  Color _colorGeocerca(GeocercaModelo zona) {
+    final valor = int.tryParse(zona.color.replaceFirst('#', ''), radix: 16);
+    return Color(0xFF000000 | (valor ?? 0x17835B));
+  }
+
+  Widget _construirSelectorGeocercas() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (_cargandoGeocercas) const LinearProgressIndicator(),
+      if (_errorGeocercas != null) ...[
+        Text(_errorGeocercas!),
+        TextButton(
+          onPressed: _cargarGeocercas,
+          child: const Text('Reintentar geocercas'),
+        ),
+      ],
+      if (!_cargandoGeocercas && _errorGeocercas == null && _geocercas.isEmpty)
+        const Text('No hay geocercas activas disponibles.'),
+      Wrap(
+        spacing: 8,
+        children: [
+          for (final sede in ['matriz', 'tunshi'])
+            ChoiceChip(
+              key: ValueKey('sede_$sede'),
+              label: Text(sede == 'matriz' ? 'Matriz' : 'Tunshi'),
+              selected: _sede == sede,
+              onSelected: _geocercas.any((z) => z.esCampus && z.sede == sede)
+                  ? (_) {
+                      setState(() => _sede = sede);
+                      _centrarEnCampusMatriz();
+                    }
+                  : null,
+            ),
+        ],
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Mostrar sectores'),
+        value: _mostrarSectores,
+        onChanged: (valor) => setState(() => _mostrarSectores = valor),
+      ),
+      if (_sede == 'tunshi')
+        const Text(
+          'Tunshi: únicamente el área delimitada en el trazado aprobado.',
+        ),
+      if (_mostrarSectores)
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final zona in _geocercas.where(
+              (z) => !z.esCampus && z.sede == _sede,
+            ))
+              Text(
+                '${zona.codigo.startsWith('S') ? zona.codigo : '●'} · ${zona.nombre}',
+                style: TextStyle(color: _colorGeocerca(zona), fontSize: 12),
+              ),
+          ],
+        ),
+    ],
+  );
   bool _solicitandoUbicacion = false;
   UbicacionUsuarioCampus? _ubicacionUsuario;
   ResultadoUbicacionUsuario? _errorUbicacion;
@@ -65,6 +164,7 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
     super.initState();
     _controladorMapa = MapController();
     _errorCargaTeselas = widget.simularErrorInicialTeselas;
+    _cargarGeocercas();
   }
 
   @override
@@ -87,10 +187,25 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
   }
 
   void _centrarEnCampusMatriz() {
-    _moverMapa(
-      ServicioUbicacionCampus.centroCampusMatriz,
-      ServicioUbicacionCampus.zoomInicialCampus,
-    );
+    final zona = _campusSeleccionado;
+    if (zona != null) {
+      try {
+        _controladorMapa.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(
+              zona.anillos.first
+                  .map((p) => LatLng(p.latitud, p.longitud))
+                  .toList(),
+            ),
+            padding: const EdgeInsets.all(25),
+          ),
+        );
+        return;
+      } catch (_) {
+        /* El controlador puede no estar acoplado todavía. */
+      }
+    }
+    _moverMapa(_centroSeleccionado, ServicioUbicacionCampus.zoomInicialCampus);
   }
 
   void _centrarEnUbicacionUsuario() {
@@ -205,6 +320,8 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
             children: [
               _construirEncabezadoMapa(),
               const SizedBox(height: 12),
+              _construirSelectorGeocercas(),
+              const SizedBox(height: 12),
               _construirMarcoMapaInteractivo(),
               if (_errorCargaTeselas) ...[
                 const SizedBox(height: 12),
@@ -259,18 +376,22 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Mapa del Campus Matriz',
-                  style: TextStyle(
+                Text(
+                  _sede == 'matriz'
+                      ? 'Mapa del Campus Matriz'
+                      : 'Mapa de Tunshi',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: TemaPatitas.colorMarronOscuro,
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'ESPOCH · Riobamba (Panamericana Sur km 1 ½)',
-                  style: TextStyle(
+                Text(
+                  _sede == 'matriz'
+                      ? 'ESPOCH · Riobamba (Panamericana Sur km 1 ½)'
+                      : 'ESPOCH · Tunshi · área delimitada',
+                  style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     color: TemaPatitas.colorTextoSecundario,
@@ -283,7 +404,9 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
                   children: [
                     _construirInsigniaInformativa(
                       icono: Icons.school_rounded,
-                      texto: 'Referencia: -1.6544, -78.6799',
+                      texto: _sede == 'matriz'
+                          ? 'Referencia: -1.6544, -78.6799'
+                          : 'Referencia: área delimitada de Tunshi',
                       colorFondo: const Color(0xFFE4F7EC),
                       colorTexto: TemaPatitas.colorVerdeEsmeralda,
                     ),
@@ -320,12 +443,15 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
         children: [
           Icon(icono, size: 13.5, color: colorTexto),
           const SizedBox(width: 4),
-          Text(
-            texto,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: colorTexto,
+          Flexible(
+            child: Text(
+              texto,
+              softWrap: true,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: colorTexto,
+              ),
             ),
           ),
         ],
@@ -337,7 +463,7 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
     final marcadores = <Marker>[
       Marker(
         key: const Key('marcador_campus_matriz'),
-        point: ServicioUbicacionCampus.centroCampusMatriz,
+        point: _centroSeleccionado,
         width: 150,
         height: 86,
         child: Column(
@@ -446,17 +572,32 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
             ],
           ),
         ),
-      for (final reporte in _ultimosPorAnimal()) Marker(
-        key: ValueKey('marcador_avistamiento_${reporte.id}'),
-        point: LatLng(reporte.latitud, reporte.longitud), width: 44, height: 44,
-        child: Tooltip(message: '${reporte.nombreAnimal} · ${reporte.fechaVisible}',
-          child: Material(color: TemaPatitas.colorVerdeEsmeralda, shape: const CircleBorder(),
-            child: InkWell(customBorder: const CircleBorder(),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) =>
-                PantallaDetalleAvistamiento(avistamiento: reporte, perfil: widget.perfil))),
-              child: const Icon(Icons.pets, color: Colors.white)))),
-      ),
-
+      for (final reporte in _ultimosPorAnimal())
+        Marker(
+          key: ValueKey('marcador_avistamiento_${reporte.id}'),
+          point: LatLng(reporte.latitud, reporte.longitud),
+          width: 44,
+          height: 44,
+          child: Tooltip(
+            message: '${reporte.nombreAnimal} · ${reporte.fechaVisible}',
+            child: Material(
+              color: TemaPatitas.colorVerdeEsmeralda,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PantallaDetalleAvistamiento(
+                      avistamiento: reporte,
+                      perfil: widget.perfil,
+                    ),
+                  ),
+                ),
+                child: const Icon(Icons.pets, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
     ];
 
     return Container(
@@ -511,6 +652,34 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
                       });
                     });
                   },
+                ),
+                PolygonLayer(
+                  polygons: [
+                    for (final zona in _geocercas.where(
+                      (z) =>
+                          z.sede == _sede && (z.esCampus || _mostrarSectores),
+                    ))
+                      Polygon(
+                        points: zona.anillos.first
+                            .map((p) => LatLng(p.latitud, p.longitud))
+                            .toList(),
+                        holePointsList: zona.anillos
+                            .skip(1)
+                            .map(
+                              (a) => a
+                                  .map((p) => LatLng(p.latitud, p.longitud))
+                                  .toList(),
+                            )
+                            .toList(),
+                        color: zona.esCampus
+                            ? Colors.transparent
+                            : _colorGeocerca(zona).withValues(alpha: 0.18),
+                        borderColor: zona.esCampus
+                            ? Colors.deepOrange
+                            : _colorGeocerca(zona),
+                        borderStrokeWidth: zona.esCampus ? 3 : 1.5,
+                      ),
+                  ],
                 ),
                 MarkerLayer(markers: marcadores),
               ],
@@ -970,13 +1139,21 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
     key: const Key('estado_vacio_avistamientos_mapa'),
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      AvistamientosRecientes(perfil: widget.perfil, limite: 50, alCargar: (lista) {
-        if (mounted) setState(() => _avistamientos = lista);
-      }),
-      const Padding(padding: EdgeInsets.all(12), child: Text(
-        'Los animales NO llevan collares ni dispositivos GPS. Los marcadores verdes muestran '
-        'el último avistamiento por animal dentro de los 50 reportes recientes consultados. '
-        'Toca un marcador para ver su fecha y abrir la ficha. Geocercas pendientes de validación.')),
+      AvistamientosRecientes(
+        perfil: widget.perfil,
+        limite: 50,
+        alCargar: (lista) {
+          if (mounted) setState(() => _avistamientos = lista);
+        },
+      ),
+      const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text(
+          'Los animales NO llevan collares ni dispositivos GPS. Los marcadores verdes muestran '
+          'el último avistamiento por animal dentro de los 50 reportes recientes consultados. '
+          'Toca un marcador para ver su fecha y abrir la ficha. Los perímetros y sectores se consultan en el servidor; la clasificación corresponde a cada reporte, no a una ubicación en tiempo real.',
+        ),
+      ),
     ],
   );
 }

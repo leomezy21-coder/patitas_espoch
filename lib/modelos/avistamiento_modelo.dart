@@ -13,6 +13,10 @@ class AvistamientoModelo {
 
   /// Resultado espacial del servidor; null significa sin validacion.
   final bool? dentroCampus;
+  final bool? fueraZonaHabitual;
+  final String? sedeDetectada;
+  final String? zonaDetectada;
+  final String? zonaHabitualReferencia;
 
   const AvistamientoModelo({
     required this.id,
@@ -26,18 +30,32 @@ class AvistamientoModelo {
     this.precisionMetros,
     this.urlFotografia,
     this.dentroCampus,
+    this.fueraZonaHabitual,
+    this.sedeDetectada,
+    this.zonaDetectada,
+    this.zonaHabitualReferencia,
   });
 
   factory AvistamientoModelo.desdeMapa(Map<String, dynamic> datos) {
     final latitud = (datos['latitud'] as num?)?.toDouble();
     final longitud = (datos['longitud'] as num?)?.toDouble();
-    final fecha = DateTime.tryParse(datos['fecha_avistamiento']?.toString() ?? '');
+    final fecha = DateTime.tryParse(
+      datos['fecha_avistamiento']?.toString() ?? '',
+    );
     final id = datos['id_avistamiento']?.toString() ?? '';
     final idAnimal = datos['id_animal']?.toString() ?? '';
-    if (id.isEmpty || idAnimal.isEmpty || fecha == null ||
-        latitud == null || longitud == null || !latitud.isFinite ||
-        !longitud.isFinite || latitud.abs() > 90 || longitud.abs() > 180) {
-      throw const FormatException('Avistamiento sin fecha o coordenadas válidas.');
+    if (id.isEmpty ||
+        idAnimal.isEmpty ||
+        fecha == null ||
+        latitud == null ||
+        longitud == null ||
+        !latitud.isFinite ||
+        !longitud.isFinite ||
+        latitud.abs() > 90 ||
+        longitud.abs() > 180) {
+      throw const FormatException(
+        'Avistamiento sin fecha o coordenadas válidas.',
+      );
     }
     final precision = (datos['precision_gps_m'] as num?)?.toDouble();
     final valorCampus = datos['dentro_campus'];
@@ -49,6 +67,10 @@ class AvistamientoModelo {
     } else {
       throw const FormatException('Resultado de geocerca no válido.');
     }
+    if (datos['fuera_zona_habitual'] != null &&
+        datos['fuera_zona_habitual'] is! bool) {
+      throw const FormatException('Comparación de zona no válida.');
+    }
     return AvistamientoModelo(
       id: id,
       idAnimal: idAnimal,
@@ -59,13 +81,19 @@ class AvistamientoModelo {
       longitud: longitud,
       fecha: fecha,
       precisionMetros: precision != null && precision.isFinite && precision >= 0
-          ? precision : null,
+          ? precision
+          : null,
       urlFotografia: datos['url_fotografia'] as String?,
       dentroCampus: dentroCampus,
+      fueraZonaHabitual: datos['fuera_zona_habitual'] as bool?,
+      sedeDetectada: datos['sede_detectada'] as String?,
+      zonaDetectada: datos['zona_detectada'] as String?,
+      zonaHabitualReferencia: datos['zona_habitual_referencia'] as String?,
     );
   }
 
-  String get coordenadas => '${latitud.toStringAsFixed(5)}, ${longitud.toStringAsFixed(5)}';
+  String get coordenadas =>
+      '${latitud.toStringAsFixed(5)}, ${longitud.toStringAsFixed(5)}';
   String get fechaVisible {
     final local = fecha.toLocal();
     String dos(int valor) => valor.toString().padLeft(2, '0');

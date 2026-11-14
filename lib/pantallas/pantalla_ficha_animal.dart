@@ -8,6 +8,7 @@ import '../modelos/perfil_usuario_modelo.dart';
 import '../servicios/servicio_animales.dart';
 import '../servicios/servicio_qr_animales.dart';
 import 'pantalla_evaluar_animal.dart';
+import 'pantalla_zona_habitual.dart';
 
 /// Ficha remota con revision administrativa y evaluaciones separadas por rol.
 class PantallaFichaAnimal extends StatefulWidget {
@@ -65,6 +66,16 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
     if (actualizado == true && mounted) {
       ServicioAnimales.notificarCambio();
       await _recargar();
+    }
+  }
+
+  Future<void> _asignarZonaHabitual() async {
+    final actualizado = await Navigator.of(context).push<AnimalModelo>(
+      MaterialPageRoute(builder: (_) => PantallaZonaHabitual(animal: animal)),
+    );
+    if (actualizado != null && mounted) {
+      setState(() => animal = actualizado);
+      ServicioAnimales.notificarCambio();
     }
   }
 
@@ -187,19 +198,45 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                                 widget.perfil != null) ...[
                               OutlinedButton.icon(
                                 onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(builder: (_) => Scaffold(
-                                    appBar: AppBar(title: Text('Avistamientos de ${animal.nombre}')),
-                                    body: SafeArea(child: ListView(children: [
-                                      AvistamientosRecientes(perfil: widget.perfil!, idAnimal: animal.id,
-                                        limite: 100, maximoVisible: 100),
-                                      const Padding(padding: EdgeInsets.all(16),
-                                        child: Text('Se muestran hasta 100 reportes recientes disponibles de este animal.')),
-                                    ])),
-                                  )),
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => Scaffold(
+                                      appBar: AppBar(
+                                        title: Text(
+                                          'Avistamientos de ${animal.nombre}',
+                                        ),
+                                      ),
+                                      body: SafeArea(
+                                        child: ListView(
+                                          children: [
+                                            AvistamientosRecientes(
+                                              perfil: widget.perfil!,
+                                              idAnimal: animal.id,
+                                              limite: 100,
+                                              maximoVisible: 100,
+                                            ),
+                                            const Padding(
+                                              padding: EdgeInsets.all(16),
+                                              child: Text(
+                                                'Se muestran hasta 100 reportes recientes disponibles de este animal.',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                                 icon: const Icon(Icons.history),
                                 label: const Text('Consultar avistamientos'),
                               ),
+                              if (widget.perfil!.rol ==
+                                      RolUsuario.administrador &&
+                                  !animal.esDemostracion)
+                                OutlinedButton.icon(
+                                  onPressed: _asignarZonaHabitual,
+                                  icon: const Icon(Icons.location_on_outlined),
+                                  label: const Text('Asignar zona habitual'),
+                                ),
                               if (widget.perfil!.rol.puedeRevisarRegistros)
                                 OutlinedButton.icon(
                                   onPressed: () =>
@@ -577,14 +614,11 @@ class TarjetaQrAnimalPatitas extends StatefulWidget {
   final AnimalModelo animal;
   final PerfilUsuarioModelo? perfil;
 
-  const TarjetaQrAnimalPatitas({
-    super.key,
-    required this.animal,
-    this.perfil,
-  });
+  const TarjetaQrAnimalPatitas({super.key, required this.animal, this.perfil});
 
   @override
-  State<TarjetaQrAnimalPatitas> createState() => _EstadoTarjetaQrAnimalPatitas();
+  State<TarjetaQrAnimalPatitas> createState() =>
+      _EstadoTarjetaQrAnimalPatitas();
 }
 
 class _EstadoTarjetaQrAnimalPatitas extends State<TarjetaQrAnimalPatitas> {
@@ -596,8 +630,7 @@ class _EstadoTarjetaQrAnimalPatitas extends State<TarjetaQrAnimalPatitas> {
       !widget.animal.esDemostracion &&
       ServicioQrAnimales.esUuidAnimalValido(widget.animal.id);
 
-  bool get _puedeAdministrarQr =>
-      widget.perfil?.rol.puedeAdministrarQr == true;
+  bool get _puedeAdministrarQr => widget.perfil?.rol.puedeAdministrarQr == true;
 
   @override
   void initState() {
@@ -811,7 +844,9 @@ class _EstadoTarjetaQrAnimalPatitas extends State<TarjetaQrAnimalPatitas> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: ColoresAnimalesPatitas.verde,
                       backgroundColor: Colors.white,
-                      side: const BorderSide(color: ColoresAnimalesPatitas.verde),
+                      side: const BorderSide(
+                        color: ColoresAnimalesPatitas.verde,
+                      ),
                     ),
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Reintentar carga de QR'),
@@ -830,10 +865,7 @@ class _EstadoTarjetaQrAnimalPatitas extends State<TarjetaQrAnimalPatitas> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: Colors.black87,
-                        width: 1.5,
-                      ),
+                      border: Border.all(color: Colors.black87, width: 1.5),
                     ),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(

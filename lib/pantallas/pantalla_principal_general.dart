@@ -8,6 +8,7 @@ import 'vista_catalogo_animales.dart';
 import 'vista_inicio_comunidad.dart';
 import 'vista_mapa_campus.dart';
 import 'pantalla_reportes_animales.dart';
+import 'pantalla_asignacion_roles.dart';
 
 /// Pantalla principal autenticada de Patitas ESPOCH.
 /// Consulta el perfil y rol del usuario desde el servidor antes de habilitar la navegacion:
@@ -981,6 +982,16 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
           label: const Text('Revisar registros de animales'),
         ),
         const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => PantallaAsignacionRoles(perfil: _resultadoPerfil!.perfil!),
+            ),
+          ),
+          icon: const Icon(Icons.manage_accounts_outlined),
+          label: const Text('Asignación de roles'),
+        ),
+        const SizedBox(height: 12),
         _construirTarjetaPermisoRol(
           categoria: 'Comunidad y Accesos',
           titulo: 'Gestión de Usuarios y Roles Institucionales',

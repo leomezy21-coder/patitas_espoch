@@ -7,6 +7,7 @@ class AnimalModelo {
   final String especie; // 'Perro' o 'Gato'
   final String caracteristicasFisicas;
   final String zonaHabitual;
+  final String? idZonaHabitual;
   final String? urlFotografia;
   final String comportamiento;
   final String recomendaciones;
@@ -33,6 +34,7 @@ class AnimalModelo {
     required this.especie,
     required this.caracteristicasFisicas,
     required this.zonaHabitual,
+    this.idZonaHabitual,
     this.urlFotografia,
     required this.comportamiento,
     required this.recomendaciones,
@@ -99,6 +101,7 @@ class AnimalModelo {
       sexo: texto('sexo'),
       caracteristicasFisicas: texto('caracteristicas_fisicas'),
       zonaHabitual: texto('zona_habitual'),
+      idZonaHabitual: datos['id_zona_habitual'] as String?,
       urlFotografia: texto('url_fotografia'),
       comportamiento: texto('comportamiento'),
       recomendaciones: texto('recomendaciones'),

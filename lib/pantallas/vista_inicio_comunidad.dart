@@ -7,6 +7,7 @@ import '../modelos/animal_modelo.dart';
 import '../modelos/perfil_usuario_modelo.dart';
 import '../servicios/servicio_animales.dart';
 import '../tema/tema_patitas.dart';
+import 'pantalla_asignacion_roles.dart';
 import 'pantalla_escanear_qr.dart';
 import 'pantalla_ficha_animal.dart';
 import 'pantalla_registro_animal.dart';
@@ -955,8 +956,8 @@ class _PanelInicioPersonalAutorizadoEstado
 ///   - "Escanear QR" -> `PantallaEscanearQr`.
 ///   - "Ver mapa de animales" -> pestana del mapa del campus.
 ///   - "Agregar otro animalito" -> `PantallaRegistroAnimal` (datos basicos).
+/// - "Asignacion de roles" abre PantallaAsignacionRoles con autorizacion en servidor.
 /// - Deja deshabilitados como "Proximamente" y sin datos inventados:
-///   - "Asignacion de roles"
 ///   - "Incidencias activas"
 ///   - "Proximas vacunas"
 ///   - "Reevaluaciones"
@@ -998,7 +999,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
         const SizedBox(height: 16),
 
         // 2. Bloque "Administrador"
-        _construirBloqueAdministrador(),
+        _construirBloqueAdministrador(context),
         const SizedBox(height: 16),
 
         // 3. Bloques "Personal autorizado" y "Usuario":
@@ -1139,7 +1140,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
     );
   }
 
-  Widget _construirBloqueAdministrador() {
+  Widget _construirBloqueAdministrador(BuildContext context) {
     return Container(
       key: const ValueKey('seccion_admin_administrador'),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
@@ -1155,10 +1156,10 @@ class _PanelInicioAdministrador extends StatelessWidget {
           ),
         ],
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
+          const Text(
             'Administrador',
             style: TextStyle(
               fontSize: 18,
@@ -1166,19 +1167,21 @@ class _PanelInicioAdministrador extends StatelessWidget {
               color: TemaPatitas.colorMarronOscuro,
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           _TarjetaResumenPersonalAutorizado(
-            key: ValueKey('tarjeta_admin_asignacion_roles'),
+            key: const ValueKey('tarjeta_admin_asignacion_roles'),
             titulo: 'Asignación de roles',
             subtitulo: 'Gestiona y asigna roles de usuario',
             icono: Icons.manage_accounts_outlined,
-            colorFondoIcono: Color(0xFFF8ABA6),
-            colorIcono: Color(0xFF6B0909),
-            colorBorde: Color(0xFFEA1D24),
-            colorFondoTarjeta: Color(0xFFFAF2E8),
-            habilitada: false,
+            colorFondoIcono: const Color(0xFFF8ABA6),
+            colorIcono: const Color(0xFF6B0909),
+            colorBorde: const Color(0xFFEA1D24),
+            colorFondoTarjeta: const Color(0xFFFAF2E8),
+            habilitada: perfil.activo,
             permitirCrecimientoVertical: true,
-            etiquetaDeshabilitada: 'Próximamente',
+            alPresionar: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => PantallaAsignacionRoles(perfil: perfil)),
+            ),
           ),
         ],
       ),
@@ -1388,7 +1391,6 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
   final int? contadorReal;
   final bool cargando;
   final bool habilitada;
-  final bool compacto;
   final bool permitirCrecimientoVertical;
   final String? etiquetaDeshabilitada;
   final VoidCallback? alPresionar;
@@ -1405,7 +1407,6 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
     this.contadorReal,
     this.cargando = false,
     required this.habilitada,
-    this.compacto = false,
     this.permitirCrecimientoVertical = false,
     this.etiquetaDeshabilitada,
     this.alPresionar,
@@ -1413,53 +1414,50 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tamanoCajaIcono = compacto ? 34.0 : 48.0;
-    final tamanoIcono = compacto ? 19.0 : 26.0;
-
     return LayoutBuilder(
       builder: (contexto, limites) {
         final mostrarInsigniaEnColumna =
             !habilitada &&
             etiquetaDeshabilitada != null &&
-            (compacto ||
-                (permitirCrecimientoVertical && limites.maxWidth < 390));
+            permitirCrecimientoVertical &&
+            limites.maxWidth < 390;
 
         return Opacity(
           opacity: habilitada ? 1.0 : 0.78,
           child: Material(
             color: colorFondoTarjeta,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(compacto ? 16 : 20),
+              borderRadius: BorderRadius.circular(20),
               side: BorderSide(color: colorBorde, width: 1.4),
             ),
             child: InkWell(
-              borderRadius: BorderRadius.circular(compacto ? 16 : 20),
+              borderRadius: BorderRadius.circular(20),
               onTap: habilitada ? alPresionar : null,
               child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: compacto ? 10 : 14,
-                  vertical: compacto ? 9 : 12,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: tamanoCajaIcono,
-                      height: tamanoCajaIcono,
+                      width: 48.0,
+                      height: 48.0,
                       decoration: BoxDecoration(
                         color: colorFondoIcono,
-                        borderRadius: BorderRadius.circular(compacto ? 10 : 14),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(icono, color: colorIcono, size: tamanoIcono),
+                      child: Icon(icono, color: colorIcono, size: 26.0),
                     ),
-                    SizedBox(width: compacto ? 8 : 14),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             titulo,
-                            style: TextStyle(
-                              fontSize: compacto ? 12.5 : 15.5,
+                            style: const TextStyle(
+                              fontSize: 15.5,
                               fontWeight: FontWeight.w900,
                               color: TemaPatitas.colorMarronOscuro,
                               height: 1.18,
@@ -1468,8 +1466,8 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
                           const SizedBox(height: 3),
                           Text(
                             subtitulo,
-                            style: TextStyle(
-                              fontSize: compacto ? 10.5 : 12.5,
+                            style: const TextStyle(
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w500,
                               color: TemaPatitas.colorTextoSecundario,
                               height: 1.25,
@@ -1547,16 +1545,16 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
                             ),
                           ),
                         Container(
-                          width: compacto ? 22 : 28,
-                          height: compacto ? 22 : 28,
+                          width: 28,
+                          height: 28,
                           decoration: const BoxDecoration(
                             color: Color(0xFFF9E5CC),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.chevron_right_rounded,
-                            size: compacto ? 16 : 20,
-                            color: const Color(0xFF4E2509),
+                            size: 20,
+                            color: Color(0xFF4E2509),
                           ),
                         ),
                       ],
