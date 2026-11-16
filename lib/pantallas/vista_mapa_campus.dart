@@ -14,6 +14,10 @@ import '../modelos/geocerca_modelo.dart';
 import '../servicios/servicio_geocercas.dart';
 import 'pantalla_detalle_avistamiento.dart';
 
+//openrouter
+import '../servicios/servicio_rutas.dart';
+
+//fin openrouter
 /// Vista interactiva del Mapa del Campus Matriz de la ESPOCH (Etapa 4).
 ///
 /// Características principales:
@@ -33,6 +37,12 @@ import 'pantalla_detalle_avistamiento.dart';
 class VistaMapaCampus extends StatefulWidget {
   final PerfilUsuarioModelo perfil;
 
+  //openrouter
+  final RutaCalculada? rutaInicial;
+  final String? nombreAnimalRuta;
+
+  //fin openrouter
+
   /// Proveedor de teselas opcional (utilizado en pruebas de widgets para evitar
   /// solicitudes de red hacia servidores externos).
   final TileProvider? proveedorTeselas;
@@ -45,6 +55,12 @@ class VistaMapaCampus extends StatefulWidget {
     required this.perfil,
     this.proveedorTeselas,
     this.simularErrorInicialTeselas = false,
+
+    //openrouter
+    this.rutaInicial,
+    this.nombreAnimalRuta,
+
+    //fin openrouter
   });
 
   @override
@@ -162,11 +178,44 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
   @override
   void initState() {
     super.initState();
+
     _controladorMapa = MapController();
     _errorCargaTeselas = widget.simularErrorInicialTeselas;
     _cargarGeocercas();
+
+    // Configurar la ruta inicial de OpenRouteService.
+    final ruta = widget.rutaInicial;
+
+    if (ruta != null) {
+      _ubicacionUsuario = UbicacionUsuarioCampus(
+        latitud: ruta.origen.latitude,
+        longitud: ruta.origen.longitude,
+        fechaCaptura: DateTime.now(),
+      );
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _enfocarRuta();
+        }
+      });
+    }
+  }
+  //openrouter
+
+  void _enfocarRuta() {
+    final ruta = widget.rutaInicial;
+    if (ruta == null || ruta.puntos.isEmpty) return;
+
+    _controladorMapa.fitCamera(
+      CameraFit.coordinates(
+        coordinates: [ruta.origen, ...ruta.puntos, ruta.destino],
+        padding: const EdgeInsets.all(35),
+        maxZoom: 18,
+      ),
+    );
   }
 
+  //final openrouter
   @override
   void dispose() {
     _controladorMapa.dispose();
@@ -175,14 +224,17 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
 
   void _moverMapa(LatLng destino, double zoom) {
     final zoomAjustado = zoom.clamp(
-      ServicioUbicacionCampus.zoomMinimoMapa,
+      widget.rutaInicial == null ? ServicioUbicacionCampus.zoomMinimoMapa : 3.0,
       ServicioUbicacionCampus.zoomMaximoMapa,
     );
+
     _zoomActual = zoomAjustado;
+
     try {
       _controladorMapa.move(destino, zoomAjustado);
     } catch (_) {
-      // Si el controlador aún no está acoplado en el primer fotograma, se ignora.
+      // Si el controlador aún no está acoplado
+      // en el primer fotograma, se ignora.
     }
   }
 
@@ -322,11 +374,56 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
               const SizedBox(height: 12),
               _construirSelectorGeocercas(),
               const SizedBox(height: 12),
+
               _construirMarcoMapaInteractivo(),
+
+              // Información de la ruta calculada por OpenRouteService
+              if (widget.rutaInicial != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Ruta al último avistamiento',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Distancia: '
+                          '${(widget.rutaInicial!.distanciaMetros / 1000).toStringAsFixed(2)} km',
+                        ),
+                        Text(
+                          'Tiempo estimado: '
+                          '${(widget.rutaInicial!.duracionSegundos / 60).toStringAsFixed(1)} min',
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'La ruta conduce al último lugar reportado. '
+                          'No representa la ubicación actual del animal.',
+                          textAlign: TextAlign.center,
+                        ),
+                        TextButton.icon(
+                          onPressed: _enfocarRuta,
+                          icon: const Icon(Icons.route),
+                          label: const Text('Enfocar ruta'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // Mantener el aviso de errores de OpenStreetMap
               if (_errorCargaTeselas) ...[
                 const SizedBox(height: 12),
                 _construirBannerErrorTeselas(),
               ],
+
               const SizedBox(height: 14),
               _construirTarjetaControlUbicacion(),
               const SizedBox(height: 14),
@@ -627,7 +724,14 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
               options: MapOptions(
                 initialCenter: ServicioUbicacionCampus.centroCampusMatriz,
                 initialZoom: ServicioUbicacionCampus.zoomInicialCampus,
-                minZoom: ServicioUbicacionCampus.zoomMinimoMapa,
+                //openrouter
+                minZoom: widget.rutaInicial == null
+                    ? ServicioUbicacionCampus.zoomMinimoMapa
+                    : 3.0,
+
+                //final openrouter
+
+                //minZoom: ServicioUbicacionCampus.zoomMinimoMapa,
                 maxZoom: ServicioUbicacionCampus.zoomMaximoMapa,
                 onPositionChanged: (posicion, _) {
                   _zoomActual = posicion.zoom;
@@ -681,6 +785,21 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
                       ),
                   ],
                 ),
+
+                //openrouter
+                if (widget.rutaInicial != null)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: widget.rutaInicial!.puntos,
+                        color: TemaPatitas.colorNaranjaPrimario,
+                        strokeWidth: 5,
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                //fin openrouter
                 MarkerLayer(markers: marcadores),
               ],
             ),

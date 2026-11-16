@@ -10,6 +10,16 @@ import '../servicios/servicio_qr_animales.dart';
 import 'pantalla_evaluar_animal.dart';
 import 'pantalla_zona_habitual.dart';
 
+//openrouter
+//import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:latlong2/latlong.dart';
+
+import '../servicios/servicio_avistamientos.dart';
+import '../servicios/servicio_ubicacion_campus.dart';
+import '../servicios/servicio_rutas.dart';
+import 'vista_mapa_campus.dart';
+
+//fin del open router
 /// Ficha remota con revision administrativa y evaluaciones separadas por rol.
 class PantallaFichaAnimal extends StatefulWidget {
   final AnimalModelo animal;
@@ -29,6 +39,10 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
   late AnimalModelo animal = widget.animal;
   bool _cargando = false;
   String? _error;
+  //openrouter
+  bool _probandoRuta = false;
+
+  //fin del open router
   @override
   void initState() {
     super.initState();
@@ -38,7 +52,94 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
       _recargar();
     }
   }
+  //openrouter
 
+  Future<void> _trazarRutaUltimoAvistamiento() async {
+    if (_probandoRuta) return;
+
+    if (animal.esDemostracion || widget.perfil == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La ruta solo está disponible para animales registrados.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _probandoRuta = true);
+
+    try {
+      // 1. Consultar el último avistamiento del animal.
+      final reportes = await ServicioAvistamientos.proveedor.listar(
+        idAnimal: animal.id,
+        limite: 1,
+      );
+
+      if (reportes.isEmpty) {
+        throw Exception(
+          'Este animal todavía no tiene avistamientos registrados.',
+        );
+      }
+
+      final ultimo = reportes.first;
+      final destino = LatLng(ultimo.latitud, ultimo.longitud);
+
+      // 2. Obtener la ubicación actual del teléfono.
+      final resultado =
+          await ServicioUbicacionCampus.solicitarUbicacionActual();
+
+      if (!resultado.exito || resultado.ubicacion == null) {
+        throw Exception(
+          resultado.mensajeError ?? 'No se pudo obtener tu ubicación.',
+        );
+      }
+
+      final origen = resultado.ubicacion!.coordenadas;
+
+      // 3. Solicitar la ruta a OpenRouteService.
+      final ruta = await ServicioRutas.calcular(
+        origen: origen,
+        destino: destino,
+      );
+
+      if (!mounted) return;
+
+      setState(() => _probandoRuta = false);
+
+      // 4. Abrir el mapa con la ruta calculada.
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: Text('Ruta hacia ${animal.nombre}')),
+            body: VistaMapaCampus(
+              perfil: widget.perfil!,
+              rutaInicial: ruta,
+              nombreAnimalRuta: animal.nombre,
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      debugPrint('Error al trazar ruta: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo trazar la ruta: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted && _probandoRuta) {
+        setState(() => _probandoRuta = false);
+      }
+    }
+  }
+
+  //fin del open router
   Future<void> _recargar() async {
     if (_cargando) return;
     setState(() {
@@ -331,13 +432,19 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                             ),
                             const SizedBox(height: 10),
                             OutlinedButton.icon(
-                              onPressed: () => _mostrarAvisoPendiente(
+                              //openrouter
+                              onPressed: _probandoRuta
+                                  ? null
+                                  : _trazarRutaUltimoAvistamiento,
+
+                              //fin del openrouter
+                              /*                              onPressed: () => _mostrarAvisoPendiente(
                                 context,
                                 'Ruta al último avistamiento',
                                 'El cálculo de rutas está pendiente de integración. '
                                     'Esta ficha todavía no ofrece una ruta real ni '
                                     'seguimiento de ubicación en tiempo real.',
-                              ),
+                              ),*/
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: ColoresAnimalesPatitas.verde,
                                 backgroundColor: Colors.white,
