@@ -16,7 +16,18 @@
         android:label="patitas_espoch"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+<!-- notificaciones push -->
 
+<meta-data
+    android:name="com.google.firebase.messaging.default_notification_channel_id"
+    android:value="patitas_alertas_v1" />
+
+
+<meta-data
+    android:name="firebase_messaging_installation_id_enabled"
+    android:value="true" />
+
+<!--fin de notificaciones push-->
         <activity
             android:name=".MainActivity"
             android:exported="true"

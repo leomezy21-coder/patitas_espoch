@@ -2,6 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+//notificaciones push
+import 'package:firebase_core/firebase_core.dart';
+
+import 'firebase_options.dart';
+
+//fin de notificaciones push
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'pantallas/pantalla_bienvenida.dart';
 import 'pantallas/pantalla_nueva_contrasena.dart';
@@ -10,15 +17,61 @@ import 'servicios/configuracion_supabase.dart';
 import 'servicios/servicio_autenticacion.dart';
 import 'tema/tema_patitas.dart';
 
+//notificaciones push
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa el cliente de Supabase. El SDK gestiona internamente la recepcion
-  // de enlaces profundos (PKCE) mediante su propio observador de AppLinks.
+  // Inicializa Firebase para las notificaciones push.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Inicializa Supabase y mantiene la autenticacion,
+  // recuperacion de contrasena y gestion de sesiones.
   await ConfiguracionSupabase.inicializar();
 
+  // Inicia la aplicacion Patitas ESPOCH.
   runApp(const AplicacionPatitasEspoch());
+  unawaited(prepararNotificacionesPrueba());
 }
+
+Future<void> prepararNotificacionesPrueba() async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+
+    // Solicitar permisos de notificaciones.
+    final permiso = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    debugPrint('Estado de notificaciones: ${permiso.authorizationStatus}');
+
+    if (permiso.authorizationStatus != AuthorizationStatus.authorized) {
+      debugPrint('Permiso de notificaciones no concedido.');
+      return;
+    }
+
+    // Escuchar el registro del dispositivo en Firebase.
+    messaging.onRegistered.listen(
+      (String installationId) {
+        debugPrint('Dispositivo registrado correctamente.');
+        debugPrint('FID_PRUEBA: $installationId');
+      },
+      onError: (Object error) {
+        debugPrint('Error de registro FCM: $error');
+      },
+    );
+
+    // Registrar el dispositivo mediante la nueva API.
+    await messaging.register();
+
+    debugPrint('Solicitud de registro FCM completada.');
+  } catch (error) {
+    debugPrint('Error al preparar notificaciones: $error');
+  }
+}
+
+//fin de notificaciones push
 
 /// Aplicacion principal de Patitas ESPOCH.
 /// Actua como punto central de navegacion segun el estado de sesion y de

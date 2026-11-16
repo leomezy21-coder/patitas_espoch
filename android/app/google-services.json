@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "260315922943",
+    "project_id": "patitas-espoch",
+    "storage_bucket": "patitas-espoch.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:260315922943:android:fe4917ae79d806c5dc27ca",
+        "android_client_info": {
+          "package_name": "com.example.patitas_espoch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoNG5loBzWhbUHhs3I7Oh3O4yWVKb4I2M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -9,7 +9,10 @@ import 'vista_inicio_comunidad.dart';
 import 'vista_mapa_campus.dart';
 import 'pantalla_reportes_animales.dart';
 import 'pantalla_asignacion_roles.dart';
+//notificacion push
+import '../servicios/servicio_notificaciones.dart';
 
+//fin notificacion push
 /// Pantalla principal autenticada de Patitas ESPOCH.
 /// Consulta el perfil y rol del usuario desde el servidor antes de habilitar la navegacion:
 /// - Mientras consulta, no muestra modulos ni barra de navegacion.
@@ -123,7 +126,10 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
   }
 
   /// Muestra un cuadro informativo con el estado actual del centro de notificaciones.
+
   void _mostrarAvisoNotificaciones() {
+    final flujo = ServicioNotificaciones.escucharNotificacionesPropias();
+
     showDialog<void>(
       context: context,
       builder: (contextoDialogo) {
@@ -138,9 +144,9 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Notificaciones del campus',
+                  'Notificaciones',
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: TemaPatitas.colorMarronOscuro,
                   ),
@@ -148,17 +154,144 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
               ),
             ],
           ),
-          content: const Text(
-            'Las notificaciones estarán disponibles próximamente.\n\n'
-            'Los avisos sobre incidencias y actualizaciones de animales '
-            'comunitarios se mostrarán aquí cuando se active el servicio de '
-            'notificaciones.',
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 350,
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: flujo,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  debugPrint('ERROR_NOTIFICACIONES: ${snapshot.error}');
+
+                  return const Center(
+                    child: Text(
+                      'No se pudieron cargar las notificaciones.',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final notificaciones = snapshot.data!;
+
+                if (notificaciones.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No tienes notificaciones por el momento.',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  itemCount: notificaciones.length,
+                  separatorBuilder: (_, _) => const Divider(height: 16),
+                  itemBuilder: (context, index) {
+                    final aviso = notificaciones[index];
+                    final leida = aviso['leida'] == true;
+
+                    return ListTile(
+                      //notificacio
+
+                      onTap: leida
+                          ? null
+                          : () async {
+                              try {
+                                final actualizado =
+                                    await ServicioNotificaciones.marcarComoLeida(
+                                      aviso['id_notificacion'].toString(),
+                                    );
+
+                                if (!actualizado && contextoDialogo.mounted) {
+                                  ScaffoldMessenger.of(contextoDialogo)
+                                      .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'No se pudo marcar la notificación como leída.',
+                                          ),
+                                        ),
+                                      );
+                                }
+                              } catch (error) {
+                                debugPrint(
+                                  'Error al marcar notificación: $error',
+                                );
+
+                                if (contextoDialogo.mounted) {
+                                  ScaffoldMessenger.of(contextoDialogo)
+                                      .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Ocurrió un error al actualizar la notificación.',
+                                          ),
+                                        ),
+                                      );
+                                }
+                              }
+                            },
+
+                      //fin de notificacion
+                      leading: Icon(
+                        leida
+                            ? Icons.notifications_none
+                            : Icons.notifications_active,
+                        color: TemaPatitas.colorNaranjaPrimario,
+                      ),
+                      title: Text(
+                        aviso['titulo']?.toString() ?? 'Notificación',
+                      ),
+                      subtitle: Text(aviso['mensaje']?.toString() ?? ''),
+                      trailing: leida
+                          ? null
+                          : const Icon(
+                              Icons.circle,
+                              size: 9,
+                              color: TemaPatitas.colorNaranjaPrimario,
+                            ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
+
           actions: [
+            // Boton para marcar todas las notificaciones como leidas.
+            TextButton(
+              onPressed: () async {
+                try {
+                  await ServicioNotificaciones.marcarTodasComoLeidas();
+                } catch (error) {
+                  debugPrint('Error al marcar todas como leídas: $error');
+
+                  if (contextoDialogo.mounted) {
+                    ScaffoldMessenger.of(contextoDialogo).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'No se pudieron actualizar las notificaciones.',
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text(
+                'Marcar todas como leídas',
+                style: TextStyle(
+                  color: TemaPatitas.colorVerdeEsmeralda,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+
+            // Boton original para cerrar la ventana.
             FilledButton(
               style: estiloBotonPrimarioNaranja(),
               onPressed: () => Navigator.of(contextoDialogo).pop(),
-              child: const Text('Entendido'),
+              child: const Text('Cerrar'),
             ),
           ],
         );
@@ -485,25 +618,47 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
                 backgroundColor: Colors.white.withValues(alpha: 0.9),
                 foregroundColor: TemaPatitas.colorMarronOscuro,
               ),
-              icon: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(Icons.notifications_none_rounded, size: 22),
-                  Positioned(
-                    right: 1,
-                    top: 1,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: TemaPatitas.colorNaranjaPrimario,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ],
+
+              icon: StreamBuilder<int>(
+                stream: ServicioNotificaciones.escucharCantidadNoLeidas(),
+                builder: (context, snapshot) {
+                  final pendientes = snapshot.data ?? 0;
+
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.notifications_none_rounded, size: 22),
+                      if (pendientes > 0)
+                        Positioned(
+                          right: -7,
+                          top: -8,
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: TemaPatitas.colorNaranjaPrimario,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              pendientes > 9 ? '9+' : '$pendientes',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
+
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.badge_outlined, size: 21),
@@ -985,7 +1140,8 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
         FilledButton.icon(
           onPressed: () => Navigator.of(context).push<void>(
             MaterialPageRoute(
-              builder: (_) => PantallaAsignacionRoles(perfil: _resultadoPerfil!.perfil!),
+              builder: (_) =>
+                  PantallaAsignacionRoles(perfil: _resultadoPerfil!.perfil!),
             ),
           ),
           icon: const Icon(Icons.manage_accounts_outlined),
