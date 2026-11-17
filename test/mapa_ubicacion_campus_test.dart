@@ -10,11 +10,13 @@ import 'package:patitas_espoch/modelos/perfil_usuario_modelo.dart';
 import 'package:patitas_espoch/pantallas/vista_mapa_campus.dart';
 import 'package:patitas_espoch/servicios/servicio_animales.dart';
 import 'package:patitas_espoch/servicios/servicio_autenticacion.dart';
+import 'package:patitas_espoch/servicios/servicio_notificaciones.dart';
 import 'package:patitas_espoch/servicios/servicio_ubicacion_campus.dart';
 import 'package:patitas_espoch/tema/tema_patitas.dart';
 
 import 'soporte/proveedor_animales_memoria.dart';
-import 'widget_test.dart' show ProveedorAutenticacionSimulado;
+import 'widget_test.dart'
+    show ProveedorAutenticacionSimulado, ProveedorNotificacionesSimulado;
 
 /// Proveedor de teselas en memoria para pruebas de widgets sin red.
 class ProveedorTeselasMemoria extends TileProvider {
@@ -131,11 +133,15 @@ void main() {
     proveedorUbicacion = ProveedorUbicacionSimulado();
     ServicioUbicacionCampus.configurarProveedorPrueba(proveedorUbicacion);
     ServicioAnimales.configurarProveedorPrueba(ProveedorAnimalesMemoria());
+    ServicioNotificaciones.configurarProveedorPrueba(
+      ProveedorNotificacionesSimulado(),
+    );
   });
 
   tearDown(() {
     ServicioUbicacionCampus.restaurarProveedor();
     ServicioAnimales.restaurarProveedor();
+    ServicioNotificaciones.restaurarProveedor();
     ServicioAutenticacion.restablecerProveedor();
   });
 

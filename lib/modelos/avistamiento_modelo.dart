@@ -92,6 +92,15 @@ class AvistamientoModelo {
     );
   }
 
+  bool get tieneCoordenadasValidas =>
+      latitud.isFinite &&
+      longitud.isFinite &&
+      latitud >= -90.0 &&
+      latitud <= 90.0 &&
+      longitud >= -180.0 &&
+      longitud <= 180.0 &&
+      !(latitud == 0.0 && longitud == 0.0);
+
   String get coordenadas =>
       '${latitud.toStringAsFixed(5)}, ${longitud.toStringAsFixed(5)}';
   String get fechaVisible {

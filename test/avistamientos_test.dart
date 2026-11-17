@@ -4,19 +4,58 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:patitas_espoch/componentes/avistamientos_recientes.dart';
 import 'package:patitas_espoch/modelos/animal_modelo.dart';
 import 'package:patitas_espoch/modelos/avistamiento_modelo.dart';
 import 'package:patitas_espoch/modelos/perfil_usuario_modelo.dart';
+import 'package:patitas_espoch/pantallas/pantalla_ficha_animal.dart';
 import 'package:patitas_espoch/pantallas/pantalla_registro_avistamiento.dart';
 import 'package:patitas_espoch/pantallas/vista_mapa_campus.dart';
 import 'package:patitas_espoch/servicios/servicio_animales.dart';
 import 'package:patitas_espoch/servicios/servicio_avistamientos.dart';
+import 'package:patitas_espoch/servicios/servicio_rutas.dart';
 import 'package:patitas_espoch/servicios/servicio_ubicacion_campus.dart';
 
 import 'soporte/proveedor_animales_memoria.dart';
 import 'soporte/proveedor_avistamientos_memoria.dart';
 import 'mapa_ubicacion_campus_test.dart' show ProveedorUbicacionSimulado, ProveedorTeselasMemoria;
+
+class ProveedorRutasSimulado implements ProveedorRutas {
+  bool fallarConexion = false;
+  LatLng? ultimoOrigen;
+  LatLng? ultimoDestino;
+  int llamadasCalcular = 0;
+
+  @override
+  Future<RutaCalculada> calcular({
+    required LatLng origen,
+    required LatLng destino,
+  }) async {
+    llamadasCalcular++;
+    ultimoOrigen = origen;
+    ultimoDestino = destino;
+    if (fallarConexion) {
+      throw const ErrorRutas(
+        'Error de conexión al calcular la ruta. Verifica tu acceso a internet e inténtalo de nuevo.',
+      );
+    }
+    return RutaCalculada(
+      origen: origen,
+      destino: destino,
+      puntos: [
+        origen,
+        LatLng(
+          (origen.latitude + destino.latitude) / 2,
+          (origen.longitude + destino.longitude) / 2,
+        ),
+        destino,
+      ],
+      distanciaMetros: 340.0,
+      duracionSegundos: 250.0,
+    );
+  }
+}
 
 const perfil = PerfilUsuarioModelo(idUsuario: '11111111-1111-4111-8111-111111111111',
   idRol: 1, rol: RolUsuario.usuarioGeneral, nombreCompleto: 'Prueba', correo: 'prueba@espoch.edu.ec', activo: true);
@@ -57,6 +96,7 @@ Future<void> revisar(WidgetTester tester) async {
 void main() {
   late ProveedorAvistamientosMemoria avistamientos;
   late ProveedorUbicacionSimulado ubicacion;
+  late ProveedorRutasSimulado rutas;
   setUp(() {
     final animales = ProveedorAnimalesMemoria()..animales = [const AnimalModelo(
       id: idAnimal, identificador: 'PAT-prueba', nombre: 'Canela', especie: 'Perro',
@@ -66,11 +106,14 @@ void main() {
     ServicioAvistamientos.configurarProveedorPrueba(avistamientos);
     ubicacion = ProveedorUbicacionSimulado();
     ServicioUbicacionCampus.configurarProveedorPrueba(ubicacion);
+    rutas = ProveedorRutasSimulado();
+    ServicioRutas.configurarProveedorPrueba(rutas);
   });
   tearDown(() {
     ServicioAnimales.restaurarProveedor();
     ServicioAvistamientos.restaurarProveedor();
     ServicioUbicacionCampus.restaurarProveedor();
+    ServicioRutas.restaurarProveedor();
   });
   test('Modelo rechaza posiciones/fechas invalidas y solicitud envia UTC sin autor ni rol', () {
     final datos = {'id_avistamiento': 'id', 'id_animal': idAnimal, 'nombre_animal': 'Canela',
@@ -182,4 +225,168 @@ void main() {
     expect(find.text('Detalle del avistamiento'), findsOneWidget);
     expect(find.textContaining('Coordenadas del reporte:'), findsOneWidget);
   });
+  testWidgets(
+    'Tarjetas de avistamientos muestran boton Como llegar solo con coordenadas validas y abren la ruta en el mapa',
+    (tester) async {
+      final conCoordenadas = reporte('valido', 5);
+      final sinCoordenadas = AvistamientoModelo(
+        id: 'sin_coords',
+        idAnimal: idAnimal,
+        nombreAnimal: 'Canela',
+        observaciones: '',
+        latitud: double.nan,
+        longitud: -78.6795,
+        fecha: DateTime.now().subtract(const Duration(minutes: 10)),
+      );
+      avistamientos.reportes = [conCoordenadas, sinCoordenadas];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AvistamientosRecientes(
+              perfil: perfil,
+              proveedorTeselasMapa: ProveedorTeselasMemoria(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final botonValido = find.byKey(
+        const ValueKey('como_llegar_avistamiento_valido'),
+      );
+      final botonInvalido = find.byKey(
+        const ValueKey('como_llegar_avistamiento_sin_coords'),
+      );
+      expect(botonValido, findsOneWidget);
+      expect(botonInvalido, findsNothing);
+
+      await tester.tap(botonValido);
+      await tester.pumpAndSettle();
+
+      expect(rutas.llamadasCalcular, 1);
+      expect(rutas.ultimoDestino?.latitude, closeTo(-1.6548, 0.0001));
+      expect(rutas.ultimoDestino?.longitude, closeTo(-78.6795, 0.0001));
+      expect(find.text('Ruta hacia Canela'), findsOneWidget);
+      expect(find.byKey(const Key('tarjeta_resumen_ruta_mapa')), findsOneWidget);
+      expect(find.text('Ruta al avistamiento de Canela'), findsOneWidget);
+      expect(find.text('Distancia: 0.34 km'), findsOneWidget);
+      expect(find.text('Tiempo estimado: 4.2 min'), findsOneWidget);
+      expect(find.byKey(const Key('marcador_destino_ruta')), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'Como llegar maneja ubicacion no autorizada y errores de conexion con OpenRouteService',
+    (tester) async {
+      avistamientos.reportes = [reporte('valido', 5)];
+      ubicacion.permisoActual = EstadoPermisoUbicacion.denegado;
+      ubicacion.permisoTrasSolicitud = EstadoPermisoUbicacion.denegado;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AvistamientosRecientes(
+              perfil: perfil,
+              proveedorTeselasMapa: ProveedorTeselasMemoria(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final botonComoLlegar = find.byKey(
+        const ValueKey('como_llegar_avistamiento_valido'),
+      );
+      await tester.tap(botonComoLlegar);
+      await tester.pumpAndSettle();
+
+      expect(rutas.llamadasCalcular, 0);
+      expect(
+        find.textContaining('No se concedió el permiso de ubicación'),
+        findsOneWidget,
+      );
+      ScaffoldMessenger.of(
+        tester.element(find.byType(AvistamientosRecientes)),
+      ).clearSnackBars();
+      await tester.pumpAndSettle();
+
+      // Al autorizar ubicación pero fallar la conexión de OpenRouteService, informa error controlado
+      ubicacion.permisoActual = EstadoPermisoUbicacion.permitido;
+      rutas.fallarConexion = true;
+
+      await tester.tap(botonComoLlegar);
+      await tester.pumpAndSettle();
+
+      expect(rutas.llamadasCalcular, 1);
+      expect(
+        find.textContaining('Error de conexión al calcular la ruta'),
+        findsOneWidget,
+      );
+    },
+  );
+  testWidgets(
+    'Ficha del animal muestra informacion util del ultimo avistamiento y conserva Trazar ruta al ultimo avistamiento',
+    (tester) async {
+      const animalRegistrado = AnimalModelo(
+        id: idAnimal,
+        identificador: 'PAT-prueba',
+        nombre: 'Canela',
+        especie: 'Perro',
+        caracteristicasFisicas: 'Pelaje canela',
+        zonaHabitual: 'Sector FIE',
+        comportamiento: 'Tranquila',
+        recomendaciones: 'Acercarse con calma',
+        vacunasAplicadas: [],
+        ultimoAvistamiento: '16/11/2026 · 09:00',
+        activo: true,
+      );
+      avistamientos.reportes = [
+        AvistamientoModelo(
+          id: 'rep_ficha',
+          idAnimal: idAnimal,
+          nombreAnimal: 'Canela',
+          observaciones: 'Frente al edificio central',
+          latitud: -1.6548,
+          longitud: -78.6795,
+          fecha: DateTime.utc(2026, 11, 16, 14, 0),
+          zonaDetectada: 'Sector Administrativo',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PantallaFichaAnimal(
+            animal: animalRegistrado,
+            perfil: perfil,
+            recargarAlIniciar: false,
+            proveedorTeselasMapa: ProveedorTeselasMemoria(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mapa pendiente de integración'), findsNothing);
+      expect(find.text('Ubicación del último avistamiento'), findsOneWidget);
+      expect(find.textContaining('-1.65480, -78.67950'), findsOneWidget);
+      expect(
+        find.textContaining('Sector detectado: Sector Administrativo'),
+        findsOneWidget,
+      );
+
+      final botonTrazar = find.byKey(
+        const ValueKey('trazar_ruta_ultimo_avistamiento'),
+      );
+      expect(botonTrazar, findsOneWidget);
+      expect(find.text('Trazar ruta al último avistamiento'), findsOneWidget);
+
+      await tester.ensureVisible(botonTrazar);
+      await tester.pumpAndSettle();
+      await tester.tap(botonTrazar);
+      await tester.pumpAndSettle();
+
+      expect(rutas.llamadasCalcular, 1);
+      expect(find.text('Ruta hacia Canela'), findsOneWidget);
+      expect(find.byKey(const Key('tarjeta_resumen_ruta_mapa')), findsOneWidget);
+    },
+  );
 }

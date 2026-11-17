@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
-import '../componentes/tarjeta_validacion_campus.dart';
 import '../componentes/tarjeta_identificacion_fotografica.dart';
+import '../componentes/tarjeta_validacion_campus.dart';
 import '../modelos/avistamiento_modelo.dart';
 import '../modelos/perfil_usuario_modelo.dart';
 import '../servicios/servicio_animales.dart';
+import '../servicios/servicio_rutas.dart';
+import '../servicios/servicio_ubicacion_campus.dart';
+import '../tema/tema_patitas.dart';
 import 'pantalla_ficha_animal.dart';
 import 'pantalla_registro_avistamiento.dart';
+import 'vista_mapa_campus.dart';
 
 class PantallaDetalleAvistamiento extends StatefulWidget {
   final AvistamientoModelo avistamiento;
   final PerfilUsuarioModelo perfil;
+  final TileProvider? proveedorTeselasMapa;
+
   const PantallaDetalleAvistamiento({
     super.key,
     required this.avistamiento,
     required this.perfil,
+    this.proveedorTeselasMapa,
   });
+
   @override
   State<PantallaDetalleAvistamiento> createState() =>
       _EstadoDetalleAvistamiento();
@@ -23,14 +33,16 @@ class PantallaDetalleAvistamiento extends StatefulWidget {
 
 class _EstadoDetalleAvistamiento extends State<PantallaDetalleAvistamiento> {
   late AvistamientoModelo _reporte;
+  bool _cargando = false;
+  bool _calculandoRuta = false;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
     _reporte = widget.avistamiento;
   }
 
-  bool _cargando = false;
-  String? _error;
   Future<void> _completarFoto() async {
     if (_cargando) return;
     setState(() => _cargando = true);
@@ -79,6 +91,85 @@ class _EstadoDetalleAvistamiento extends State<PantallaDetalleAvistamiento> {
     }
   }
 
+  Future<void> _trazarRutaAvistamiento() async {
+    if (_calculandoRuta) return;
+
+    if (!_reporte.tieneCoordenadasValidas) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Este avistamiento no cuenta con coordenadas válidas para trazar una ruta.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _calculandoRuta = true);
+
+    try {
+      final resultadoUbicacion =
+          await ServicioUbicacionCampus.solicitarUbicacionActual();
+
+      if (!mounted) return;
+
+      if (!resultadoUbicacion.exito || resultadoUbicacion.ubicacion == null) {
+        final mensaje =
+            resultadoUbicacion.mensajeError ??
+            'No se pudo obtener tu ubicación actual para calcular la ruta.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+
+      final origen = resultadoUbicacion.ubicacion!.coordenadas;
+      final destino = LatLng(_reporte.latitud, _reporte.longitud);
+
+      final ruta = await ServicioRutas.calcular(
+        origen: origen,
+        destino: destino,
+      );
+
+      if (!mounted) return;
+
+      setState(() => _calculandoRuta = false);
+
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: Text('Ruta hacia ${_reporte.nombreAnimal}')),
+            body: VistaMapaCampus(
+              perfil: widget.perfil,
+              proveedorTeselas: widget.proveedorTeselasMapa,
+              rutaInicial: ruta,
+              nombreAnimalRuta: _reporte.nombreAnimal,
+              detalleAvistamientoRuta:
+                  '${_reporte.fechaVisible} (${_reporte.coordenadas})',
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo trazar la ruta: ${ServicioRutas.mensajeError(error)}',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted && _calculandoRuta) {
+        setState(() => _calculandoRuta = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final reporte = _reporte;
@@ -117,6 +208,29 @@ class _EstadoDetalleAvistamiento extends State<PantallaDetalleAvistamiento> {
               Text(
                 'Precisión registrada: ±${reporte.precisionMetros!.toStringAsFixed(1)} m',
               ),
+            if (reporte.tieneCoordenadasValidas) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const ValueKey('como_llegar_detalle_avistamiento'),
+                onPressed: _calculandoRuta ? null : _trazarRutaAvistamiento,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: TemaPatitas.colorVerdeEsmeralda,
+                  side: const BorderSide(
+                    color: TemaPatitas.colorVerdeEsmeralda,
+                  ),
+                ),
+                icon: _calculandoRuta
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.directions_walk_rounded),
+                label: Text(
+                  _calculandoRuta ? 'Calculando ruta…' : 'Cómo llegar',
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TarjetaValidacionCampus(
               dentroCampus: reporte.dentroCampus,
