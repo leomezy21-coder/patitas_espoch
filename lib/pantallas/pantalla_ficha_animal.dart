@@ -11,9 +11,10 @@ import 'pantalla_evaluar_animal.dart';
 import 'pantalla_zona_habitual.dart';
 
 //openrouter
-//import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../modelos/avistamiento_modelo.dart';
 import '../servicios/servicio_avistamientos.dart';
 import '../servicios/servicio_ubicacion_campus.dart';
 import '../servicios/servicio_rutas.dart';
@@ -25,11 +26,13 @@ class PantallaFichaAnimal extends StatefulWidget {
   final AnimalModelo animal;
   final PerfilUsuarioModelo? perfil;
   final bool recargarAlIniciar;
+  final TileProvider? proveedorTeselasMapa;
   const PantallaFichaAnimal({
     super.key,
     required this.animal,
     this.perfil,
     this.recargarAlIniciar = true,
+    this.proveedorTeselasMapa,
   });
   @override
   State<PantallaFichaAnimal> createState() => _EstadoFichaAnimal();
@@ -41,18 +44,37 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
   String? _error;
   //openrouter
   bool _probandoRuta = false;
+  AvistamientoModelo? _ultimoAvistamientoReporte;
 
   //fin del open router
   @override
   void initState() {
     super.initState();
-    if (widget.recargarAlIniciar &&
-        widget.perfil != null &&
-        !animal.esDemostracion) {
-      _recargar();
+    if (widget.perfil != null && !animal.esDemostracion) {
+      if (widget.recargarAlIniciar) {
+        _recargar();
+      }
+      _cargarUltimoAvistamiento();
     }
   }
   //openrouter
+
+  Future<void> _cargarUltimoAvistamiento() async {
+    try {
+      final reportes = await ServicioAvistamientos.proveedor.listar(
+        idAnimal: animal.id,
+        limite: 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _ultimoAvistamientoReporte = reportes.isNotEmpty
+            ? reportes.first
+            : null;
+      });
+    } catch (_) {
+      // Si la consulta auxiliar de avistamientos falla, la ficha principal se conserva.
+    }
+  }
 
   Future<void> _trazarRutaUltimoAvistamiento() async {
     if (_probandoRuta) return;
@@ -78,12 +100,17 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
       );
 
       if (reportes.isEmpty) {
-        throw Exception(
+        throw const ErrorRutas(
           'Este animal todavía no tiene avistamientos registrados.',
         );
       }
 
       final ultimo = reportes.first;
+      if (!ultimo.tieneCoordenadasValidas) {
+        throw const ErrorRutas(
+          'El último avistamiento registrado no cuenta con coordenadas válidas.',
+        );
+      }
       final destino = LatLng(ultimo.latitud, ultimo.longitud);
 
       // 2. Obtener la ubicación actual del teléfono.
@@ -91,7 +118,7 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
           await ServicioUbicacionCampus.solicitarUbicacionActual();
 
       if (!resultado.exito || resultado.ubicacion == null) {
-        throw Exception(
+        throw ErrorRutas(
           resultado.mensajeError ?? 'No se pudo obtener tu ubicación.',
         );
       }
@@ -106,7 +133,10 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
 
       if (!mounted) return;
 
-      setState(() => _probandoRuta = false);
+      setState(() {
+        _probandoRuta = false;
+        _ultimoAvistamientoReporte = ultimo;
+      });
 
       // 4. Abrir el mapa con la ruta calculada.
       await Navigator.of(context).push<void>(
@@ -115,8 +145,11 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
             appBar: AppBar(title: Text('Ruta hacia ${animal.nombre}')),
             body: VistaMapaCampus(
               perfil: widget.perfil!,
+              proveedorTeselas: widget.proveedorTeselasMapa,
               rutaInicial: ruta,
               nombreAnimalRuta: animal.nombre,
+              detalleAvistamientoRuta:
+                  '${ultimo.fechaVisible} (${ultimo.coordenadas})',
             ),
           ),
         ),
@@ -128,7 +161,9 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo trazar la ruta: $error'),
+          content: Text(
+            'No se pudo trazar la ruta: ${ServicioRutas.mensajeError(error)}',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -149,6 +184,7 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
     try {
       final actual = await ServicioAnimales.proveedor.obtener(animal.id);
       if (mounted) setState(() => animal = actual);
+      await _cargarUltimoAvistamiento();
     } catch (error) {
       if (mounted) {
         setState(() => _error = ServicioAnimales.mensajeError(error));
@@ -297,71 +333,10 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               Text(animal.observacionRevision),
                             if (!animal.esDemostracion &&
                                 widget.perfil != null) ...[
-                              OutlinedButton.icon(
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => Scaffold(
-                                      appBar: AppBar(
-                                        title: Text(
-                                          'Avistamientos de ${animal.nombre}',
-                                        ),
-                                      ),
-                                      body: SafeArea(
-                                        child: ListView(
-                                          children: [
-                                            AvistamientosRecientes(
-                                              perfil: widget.perfil!,
-                                              idAnimal: animal.id,
-                                              limite: 100,
-                                              maximoVisible: 100,
-                                            ),
-                                            const Padding(
-                                              padding: EdgeInsets.all(16),
-                                              child: Text(
-                                                'Se muestran hasta 100 reportes recientes disponibles de este animal.',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.history),
-                                label: const Text('Consultar avistamientos'),
-                              ),
-                              if (widget.perfil!.rol ==
-                                      RolUsuario.administrador &&
-                                  !animal.esDemostracion)
-                                OutlinedButton.icon(
-                                  onPressed: _asignarZonaHabitual,
-                                  icon: const Icon(Icons.location_on_outlined),
-                                  label: const Text('Asignar zona habitual'),
-                                ),
-                              if (widget.perfil!.rol.puedeRevisarRegistros)
-                                OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _evaluar(TipoEvaluacionAnimal.revision),
-                                  icon: const Icon(Icons.fact_check_outlined),
-                                  label: const Text('Revisar registro básico'),
-                                ),
-                              if (widget.perfil!.rol.puedeValidarSalud) ...[
-                                OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _evaluar(TipoEvaluacionAnimal.vacunacion),
-                                  icon: const Icon(Icons.vaccines_outlined),
-                                  label: const Text('Evaluar vacunación'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () => _evaluar(
-                                    TipoEvaluacionAnimal.comportamiento,
-                                  ),
-                                  icon: const Icon(Icons.pets_outlined),
-                                  label: const Text('Evaluar comportamiento'),
-                                ),
-                              ],
+                              const SizedBox(height: 10),
+                              _construirAccionesSuperioresFicha(),
                             ],
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 16),
                             _TarjetaInformacionAnimal(
                               titulo: 'Datos básicos',
                               icono: Icons.info_outline,
@@ -401,7 +376,7 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                             ),
                             const SizedBox(height: 14),
                             _construirAvisoMapa(),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 16),
                             FilledButton.icon(
                               key: const ValueKey('reportar_desde_ficha'),
                               onPressed: () => _mostrarAvisoPendiente(
@@ -414,59 +389,79 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               style: FilledButton.styleFrom(
                                 backgroundColor: ColoresAnimalesPatitas.naranja,
                                 foregroundColor: Colors.white,
-                                minimumSize: const Size(0, 52),
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                minimumSize: const Size(0, 42),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 16,
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(28),
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
                               ),
-                              icon: const Icon(Icons.add_location_alt_outlined),
+                              icon: const Icon(
+                                Icons.add_location_alt_outlined,
+                                size: 18,
+                              ),
                               label: const Text(
                                 'Reportar avistamiento',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             OutlinedButton.icon(
+                              key: const ValueKey(
+                                'trazar_ruta_ultimo_avistamiento',
+                              ),
                               //openrouter
                               onPressed: _probandoRuta
                                   ? null
                                   : _trazarRutaUltimoAvistamiento,
-
                               //fin del openrouter
-                              /*                              onPressed: () => _mostrarAvisoPendiente(
-                                context,
-                                'Ruta al último avistamiento',
-                                'El cálculo de rutas está pendiente de integración. '
-                                    'Esta ficha todavía no ofrece una ruta real ni '
-                                    'seguimiento de ubicación en tiempo real.',
-                              ),*/
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: ColoresAnimalesPatitas.verde,
                                 backgroundColor: Colors.white,
-                                minimumSize: const Size(0, 50),
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                minimumSize: const Size(0, 40),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 14,
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
                                 ),
                                 side: const BorderSide(
                                   color: ColoresAnimalesPatitas.verde,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(28),
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
                               ),
-                              icon: const Icon(Icons.directions_walk_rounded),
+                              icon: _probandoRuta
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.directions_walk_rounded,
+                                      size: 18,
+                                    ),
                               label: const Text(
                                 'Trazar ruta al último avistamiento',
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             TextButton.icon(
                               key: const ValueKey(
                                 'volver_catalogo_desde_ficha',
@@ -474,8 +469,22 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               onPressed: () => Navigator.of(context).maybePop(),
                               style: TextButton.styleFrom(
                                 foregroundColor: ColoresAnimalesPatitas.verde,
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                minimumSize: const Size(0, 36),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                              icon: const Icon(Icons.arrow_back_rounded),
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                size: 18,
+                              ),
                               label: const Text('Volver al catálogo'),
                             ),
                           ],
@@ -486,6 +495,149 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _construirAccionesSuperioresFicha() {
+    final perfilActual = widget.perfil!;
+    final botonesSecundarios = <Widget>[
+      if (perfilActual.rol == RolUsuario.administrador && !animal.esDemostracion)
+        _construirBotonAccionSecundaria(
+          etiqueta: 'Asignar zona habitual',
+          icono: Icons.place_outlined,
+          alPresionar: _asignarZonaHabitual,
+        ),
+      if (perfilActual.rol.puedeRevisarRegistros)
+        _construirBotonAccionSecundaria(
+          etiqueta: 'Revisar registro básico',
+          icono: Icons.description_outlined,
+          alPresionar: () => _evaluar(TipoEvaluacionAnimal.revision),
+        ),
+      if (perfilActual.rol.puedeValidarSalud) ...[
+        _construirBotonAccionSecundaria(
+          etiqueta: 'Evaluar vacunación',
+          icono: Icons.vaccines_outlined,
+          alPresionar: () => _evaluar(TipoEvaluacionAnimal.vacunacion),
+        ),
+        _construirBotonAccionSecundaria(
+          etiqueta: 'Evaluar comportamiento',
+          icono: Icons.pets_outlined,
+          alPresionar: () => _evaluar(TipoEvaluacionAnimal.comportamiento),
+        ),
+      ],
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => Scaffold(
+                appBar: AppBar(
+                  title: Text('Avistamientos de ${animal.nombre}'),
+                ),
+                body: SafeArea(
+                  child: ListView(
+                    children: [
+                      AvistamientosRecientes(
+                        perfil: perfilActual,
+                        idAnimal: animal.id,
+                        limite: 100,
+                        maximoVisible: 100,
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Se muestran hasta 100 reportes recientes disponibles de este animal.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          style: FilledButton.styleFrom(
+            backgroundColor: ColoresAnimalesPatitas.verde,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: const Size(0, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            textStyle: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.location_searching_rounded, size: 18),
+          label: const Text(
+            'Consultar avistamientos',
+            textAlign: TextAlign.center,
+          ),
+        ),
+        if (botonesSecundarios.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (contexto, limites) {
+              final usarDosColumnas =
+                  botonesSecundarios.length == 2 &&
+                  limites.maxWidth >= 340 &&
+                  MediaQuery.textScalerOf(contexto).scale(12.5) <= 16.0;
+              if (usarDosColumnas) {
+                return Row(
+                  children: [
+                    Expanded(child: botonesSecundarios[0]),
+                    const SizedBox(width: 8),
+                    Expanded(child: botonesSecundarios[1]),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < botonesSecundarios.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 6),
+                    botonesSecundarios[i],
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _construirBotonAccionSecundaria({
+    required String etiqueta,
+    required IconData icono,
+    required VoidCallback alPresionar,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: alPresionar,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: ColoresAnimalesPatitas.cafe,
+        backgroundColor: Colors.white,
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        textStyle: const TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+        side: const BorderSide(color: ColoresAnimalesPatitas.borde),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      icon: Icon(icono, size: 16.5, color: ColoresAnimalesPatitas.verde),
+      label: Text(etiqueta, textAlign: TextAlign.center),
     );
   }
 
@@ -616,22 +768,51 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
   }
 
   Widget _construirAvisoMapa() {
+    final reporte = _ultimoAvistamientoReporte;
+    final detalles = <String>[];
+
+    if (reporte != null) {
+      detalles.add('Fecha reportada: ${reporte.fechaVisible}');
+      if (reporte.tieneCoordenadasValidas) {
+        detalles.add('Coordenadas: ${reporte.coordenadas}');
+      }
+      if (reporte.zonaDetectada != null &&
+          reporte.zonaDetectada!.trim().isNotEmpty) {
+        detalles.add('Sector detectado: ${reporte.zonaDetectada!.trim()}');
+      }
+      if (reporte.observaciones.trim().isNotEmpty) {
+        detalles.add('Observación: ${reporte.observaciones.trim()}');
+      }
+    } else if (animal.ultimoAvistamiento.trim().isNotEmpty) {
+      detalles.add(
+        'Último registro: ${textoAnimalVisible(animal.ultimoAvistamiento)}',
+      );
+      if (animal.zonaHabitual.trim().isNotEmpty) {
+        detalles.add('Zona habitual: ${textoAnimalVisible(animal.zonaHabitual)}');
+      }
+    } else {
+      detalles.add(
+        'Todavía no existen avistamientos con ubicación registrados para este animal.',
+      );
+    }
+
     return Container(
+      key: const ValueKey('tarjeta_ubicacion_ultimo_avistamiento'),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: ColoresAnimalesPatitas.menta,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(
-            Icons.map_outlined,
+          const Icon(
+            Icons.location_on_outlined,
             size: 36,
             color: ColoresAnimalesPatitas.verde,
           ),
-          SizedBox(height: 10),
-          Text(
-            'Mapa pendiente de integración',
+          const SizedBox(height: 10),
+          const Text(
+            'Ubicación del último avistamiento',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: ColoresAnimalesPatitas.verde,
@@ -639,10 +820,20 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
               fontSize: 16,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            'Las ubicaciones corresponderán a reportes de la comunidad. '
-            'Los animales no llevan dispositivos de rastreo GPS.',
+            detalles.join('\n'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.45,
+              color: ColoresAnimalesPatitas.cafe,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Las ubicaciones provienen de reportes fechados de la comunidad y permiten trazar la ruta peatonal al último punto registrado. Los animales no llevan dispositivos de rastreo GPS.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,

@@ -40,6 +40,7 @@ class VistaMapaCampus extends StatefulWidget {
   //openrouter
   final RutaCalculada? rutaInicial;
   final String? nombreAnimalRuta;
+  final String? detalleAvistamientoRuta;
 
   //fin openrouter
 
@@ -59,6 +60,7 @@ class VistaMapaCampus extends StatefulWidget {
     //openrouter
     this.rutaInicial,
     this.nombreAnimalRuta,
+    this.detalleAvistamientoRuta,
 
     //fin openrouter
   });
@@ -206,13 +208,17 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
     final ruta = widget.rutaInicial;
     if (ruta == null || ruta.puntos.isEmpty) return;
 
-    _controladorMapa.fitCamera(
-      CameraFit.coordinates(
-        coordinates: [ruta.origen, ...ruta.puntos, ruta.destino],
-        padding: const EdgeInsets.all(35),
-        maxZoom: 18,
-      ),
-    );
+    try {
+      _controladorMapa.fitCamera(
+        CameraFit.coordinates(
+          coordinates: [ruta.origen, ...ruta.puntos, ruta.destino],
+          padding: const EdgeInsets.all(35),
+          maxZoom: 18,
+        ),
+      );
+    } catch (_) {
+      // Si el controlador aún no está acoplado al mapa, se ignora.
+    }
   }
 
   //final openrouter
@@ -381,17 +387,36 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
               if (widget.rutaInicial != null) ...[
                 const SizedBox(height: 12),
                 Card(
+                  key: const Key('tarjeta_resumen_ruta_mapa'),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        const Text(
-                          'Ruta al último avistamiento',
-                          style: TextStyle(
+                        Text(
+                          widget.nombreAnimalRuta != null &&
+                                  widget.nombreAnimalRuta!.trim().isNotEmpty
+                              ? 'Ruta al avistamiento de ${widget.nombreAnimalRuta!.trim()}'
+                              : 'Ruta al último avistamiento',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (widget.detalleAvistamientoRuta != null &&
+                            widget.detalleAvistamientoRuta!
+                                .trim()
+                                .isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Avistamiento: ${widget.detalleAvistamientoRuta!.trim()}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: TemaPatitas.colorTextoSecundario,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         Text(
                           'Distancia: '
@@ -408,6 +433,7 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
                           textAlign: TextAlign.center,
                         ),
                         TextButton.icon(
+                          key: const Key('boton_enfocar_ruta_mapa'),
                           onPressed: _enfocarRuta,
                           icon: const Icon(Icons.route),
                           label: const Text('Enfocar ruta'),
@@ -693,6 +719,67 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
                 child: const Icon(Icons.pets, color: Colors.white),
               ),
             ),
+          ),
+        ),
+      if (widget.rutaInicial != null)
+        Marker(
+          key: const Key('marcador_destino_ruta'),
+          point: widget.rutaInicial!.destino,
+          width: 150,
+          height: 86,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: TemaPatitas.colorVerdeEsmeralda,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  widget.nombreAnimalRuta != null &&
+                          widget.nombreAnimalRuta!.trim().isNotEmpty
+                      ? widget.nombreAnimalRuta!.trim()
+                      : 'Avistamiento',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: TemaPatitas.colorVerdeEsmeralda,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2.4),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.flag_rounded,
+                  color: Colors.white,
+                  size: 19,
+                ),
+              ),
+            ],
           ),
         ),
     ];
@@ -1261,6 +1348,7 @@ class _VistaMapaCampusEstado extends State<VistaMapaCampus> {
       AvistamientosRecientes(
         perfil: widget.perfil,
         limite: 50,
+        proveedorTeselasMapa: widget.proveedorTeselas,
         alCargar: (lista) {
           if (mounted) setState(() => _avistamientos = lista);
         },

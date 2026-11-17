@@ -201,7 +201,7 @@ class _EstadoRegistroAvistamiento extends State<PantallaRegistroAvistamiento> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('Registra dónde y cuándo viste al animal.', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          const Text('Solo campus matriz ESPOCH. Los reportes son observaciones de la comunidad; los animales no llevan GPS.'),
+          const Text('La ubicación se compara con las geocercas de Campus Matriz y Tunshi. Los reportes son observaciones de la comunidad; los animales no llevan GPS.'),
           const SizedBox(height: 20),
           if (_cargando) const Center(child: CircularProgressIndicator())
           else if (_animales.isEmpty) ...[

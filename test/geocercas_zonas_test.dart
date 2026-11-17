@@ -13,6 +13,7 @@ import 'mapa_ubicacion_campus_test.dart' show ProveedorTeselasMemoria;
 
 import 'package:patitas_espoch/modelos/avistamiento_modelo.dart';
 import 'package:patitas_espoch/componentes/tarjeta_validacion_campus.dart';
+import 'package:patitas_espoch/pantallas/pantalla_detalle_avistamiento.dart';
 import 'package:patitas_espoch/servicios/servicio_geocercas.dart';
 
 Map<String, dynamic> zona() => {
@@ -248,6 +249,121 @@ void main() {
         find.text('Sector: sin sector delimitado en este punto'),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'TarjetaValidacionCampus y PantallaDetalleAvistamiento presentan los tres estados de zona habitual',
+    (tester) async {
+      const perfilPrueba = PerfilUsuarioModelo(
+        idUsuario: '11111111-1111-4111-8111-111111111111',
+        idRol: 1,
+        rol: RolUsuario.usuarioGeneral,
+        nombreCompleto: 'Prueba',
+        correo: 'prueba@espoch.edu.ec',
+        activo: true,
+      );
+
+      // 1. Animal observado dentro de su zona habitual
+      final reporteDentroHabitual = AvistamientoModelo(
+        id: 'av-dentro-habitual',
+        idAnimal: 'animal-1',
+        nombreAnimal: 'Canela',
+        observaciones: 'En su sector habitual',
+        latitud: -1.6548,
+        longitud: -78.6795,
+        fecha: DateTime.utc(2026, 11, 16, 14, 0),
+        dentroCampus: true,
+        sedeDetectada: 'Campus Matriz ESPOCH',
+        zonaDetectada: 'Facultad de Mecánica',
+        fueraZonaHabitual: false,
+        zonaHabitualReferencia: 'Facultad de Mecánica',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PantallaDetalleAvistamiento(
+            key: const ValueKey('detalle_dentro'),
+            avistamiento: reporteDentroHabitual,
+            perfil: perfilPrueba,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(TarjetaValidacionCampus), findsOneWidget);
+      expect(find.text('Dentro de Campus Matriz ESPOCH'), findsOneWidget);
+      expect(find.text('Sector: Facultad de Mecánica'), findsOneWidget);
+      expect(find.text('Dentro de su zona habitual'), findsOneWidget);
+      expect(
+        find.text('Zona de referencia del reporte: Facultad de Mecánica'),
+        findsOneWidget,
+      );
+
+      // 2. Animal observado fuera de su zona habitual
+      final reporteFueraHabitual = AvistamientoModelo(
+        id: 'av-fuera-habitual',
+        idAnimal: 'animal-1',
+        nombreAnimal: 'Canela',
+        observaciones: 'En otro sector del campus',
+        latitud: -1.6580,
+        longitud: -78.6800,
+        fecha: DateTime.utc(2026, 11, 16, 15, 0),
+        dentroCampus: true,
+        sedeDetectada: 'Campus Matriz ESPOCH',
+        zonaDetectada: 'Complejo Deportivo',
+        fueraZonaHabitual: true,
+        zonaHabitualReferencia: 'Facultad de Mecánica',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PantallaDetalleAvistamiento(
+            key: const ValueKey('detalle_fuera'),
+            avistamiento: reporteFueraHabitual,
+            perfil: perfilPrueba,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sector: Complejo Deportivo'), findsOneWidget);
+      expect(find.text('Fuera de su zona habitual'), findsOneWidget);
+      expect(
+        find.text('Zona de referencia del reporte: Facultad de Mecánica'),
+        findsOneWidget,
+      );
+
+      // 3. Animal sin zona habitual asignada (resultado pendiente)
+      final reporteSinZonaHabitual = AvistamientoModelo(
+        id: 'av-sin-habitual',
+        idAnimal: 'animal-2',
+        nombreAnimal: 'Oso',
+        observaciones: 'Sin zona habitual asignada',
+        latitud: -1.6548,
+        longitud: -78.6795,
+        fecha: DateTime.utc(2026, 11, 16, 16, 0),
+        dentroCampus: true,
+        sedeDetectada: 'Campus Matriz ESPOCH',
+        zonaDetectada: 'Facultad de Informática y Electrónica',
+        fueraZonaHabitual: null,
+        zonaHabitualReferencia: null,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PantallaDetalleAvistamiento(
+            key: const ValueKey('detalle_pendiente'),
+            avistamiento: reporteSinZonaHabitual,
+            perfil: perfilPrueba,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Sector: Facultad de Informática y Electrónica'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Comparación con zona habitual pendiente'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Zona de referencia del reporte:'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

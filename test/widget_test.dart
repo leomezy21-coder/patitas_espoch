@@ -13,11 +13,78 @@ import 'package:patitas_espoch/pantallas/pantalla_registro_usuario.dart';
 import 'package:patitas_espoch/pantallas/vista_catalogo_animales.dart';
 import 'package:patitas_espoch/pantallas/vista_inicio_comunidad.dart';
 import 'package:patitas_espoch/servicios/servicio_autenticacion.dart';
+import 'package:patitas_espoch/servicios/servicio_notificaciones.dart';
 import 'package:patitas_espoch/tema/tema_patitas.dart';
 import 'package:patitas_espoch/servicios/servicio_animales.dart';
 import 'package:patitas_espoch/pantallas/pantalla_registro_animal.dart';
 
 import 'soporte/proveedor_animales_memoria.dart';
+
+/// Doble de prueba para simular notificaciones en memoria durante las pruebas de widgets.
+class ProveedorNotificacionesSimulado extends ProveedorNotificaciones {
+  final List<Map<String, dynamic>> _notificaciones;
+  final StreamController<List<Map<String, dynamic>>> _controlador =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+  final List<String> marcadasIndividualmente = <String>[];
+  int llamadasMarcarTodas = 0;
+
+  ProveedorNotificacionesSimulado({
+    List<Map<String, dynamic>>? notificacionesIniciales,
+  }) : _notificaciones = (notificacionesIniciales ?? <Map<String, dynamic>>[])
+           .map((item) => Map<String, dynamic>.from(item))
+           .toList();
+
+  List<Map<String, dynamic>> get notificaciones => _notificaciones;
+
+  List<Map<String, dynamic>> _copiarLista() {
+    return _notificaciones
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  void _emitir() {
+    if (!_controlador.isClosed) {
+      _controlador.add(_copiarLista());
+    }
+  }
+
+  @override
+  Stream<List<Map<String, dynamic>>> escucharNotificacionesPropias() async* {
+    yield _copiarLista();
+    yield* _controlador.stream;
+  }
+
+  @override
+  Future<bool> marcarComoLeida(String id) async {
+    marcadasIndividualmente.add(id);
+    for (final item in _notificaciones) {
+      if (item['id_notificacion']?.toString() == id) {
+        item['leida'] = true;
+        _emitir();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
+  Future<int> marcarTodasComoLeidas() async {
+    llamadasMarcarTodas++;
+    var actualizadas = 0;
+    for (final item in _notificaciones) {
+      if (item['leida'] != true) {
+        item['leida'] = true;
+        actualizadas++;
+      }
+    }
+    _emitir();
+    return actualizadas;
+  }
+
+  Future<void> liberar() async {
+    await _controlador.close();
+  }
+}
 
 /// Doble de prueba para simular estados de sesión y respuestas de autenticación
 /// sin requerir conexión de red hacia Supabase.
@@ -218,9 +285,13 @@ class ProveedorAutenticacionSimulado implements ProveedorAutenticacion {
 void main() {
   setUp(() {
     ServicioAnimales.configurarProveedorPrueba(ProveedorAnimalesMemoria());
+    ServicioNotificaciones.configurarProveedorPrueba(
+      ProveedorNotificacionesSimulado(),
+    );
   });
   tearDown(() {
     ServicioAnimales.restaurarProveedor();
+    ServicioNotificaciones.restaurarProveedor();
     ServicioAutenticacion.restablecerProveedor();
   });
 
@@ -903,6 +974,145 @@ void main() {
 
       expect(find.textContaining('Rol: Administrador'), findsOneWidget);
       expect(find.text('Admin'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Centro de notificaciones muestra conteo de no leídas, abre diálogo, marca individual y todas como leídas, y oculta contador al quedar en cero',
+    (WidgetTester tester) async {
+      final proveedorAuth = ProveedorAutenticacionSimulado(
+        sesionInicial: true,
+        correoInicial: 'notificaciones@espoch.edu.ec',
+        rolSimulado: RolUsuario.usuarioGeneral,
+        nombreCompletoSimulado: 'Lucía Chimborazo',
+      );
+      final proveedorNotificaciones = ProveedorNotificacionesSimulado(
+        notificacionesIniciales: <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id_notificacion': 'noti-1',
+            'titulo': 'Incidencia reportada en FIE',
+            'mensaje': 'Se registró una nueva incidencia cerca del Bloque A.',
+            'leida': false,
+          },
+          <String, dynamic>{
+            'id_notificacion': 'noti-2',
+            'titulo': 'Vacunación actualizada',
+            'mensaje': 'Se validó el esquema de vacunación de Canela.',
+            'leida': false,
+          },
+          <String, dynamic>{
+            'id_notificacion': 'noti-3',
+            'titulo': 'Registro revisado',
+            'mensaje': 'La ficha de Chocolate fue aprobada.',
+            'leida': false,
+          },
+          <String, dynamic>{
+            'id_notificacion': 'noti-4',
+            'titulo': 'Aviso leído anteriormente',
+            'mensaje': 'Notificación histórica ya leída.',
+            'leida': true,
+          },
+        ],
+      );
+      addTearDown(proveedorAuth.liberar);
+      addTearDown(proveedorNotificaciones.liberar);
+      ServicioAutenticacion.configurarProveedorPrueba(proveedorAuth);
+      ServicioNotificaciones.configurarProveedorPrueba(proveedorNotificaciones);
+
+      await tester.pumpWidget(const AplicacionPatitasEspoch());
+      await tester.pumpAndSettle();
+
+      // 1. Conteo inicial de notificaciones no leídas (3 de 4)
+      final botonCampana = find.byTooltip('Notificaciones');
+      expect(botonCampana, findsOneWidget);
+      expect(
+        find.descendant(of: botonCampana, matching: find.text('3')),
+        findsOneWidget,
+      );
+
+      // 2. Apertura del centro de notificaciones
+      await tester.tap(botonCampana);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Notificaciones'), findsOneWidget);
+      expect(find.text('Incidencia reportada en FIE'), findsOneWidget);
+      expect(find.text('Vacunación actualizada'), findsOneWidget);
+      expect(find.text('Registro revisado'), findsOneWidget);
+      expect(find.text('Aviso leído anteriormente'), findsOneWidget);
+
+      // 3. Marcado individual como leído al pulsar una notificación no leída
+      await tester.tap(find.text('Incidencia reportada en FIE'));
+      await tester.pumpAndSettle();
+
+      expect(proveedorNotificaciones.marcadasIndividualmente, <String>['noti-1']);
+      expect(
+        find.descendant(of: botonCampana, matching: find.text('2')),
+        findsOneWidget,
+      );
+
+      // 4. Marcado de todas las notificaciones como leídas y desaparición del contador
+      await tester.tap(
+        find.widgetWithText(TextButton, 'Marcar todas como leídas'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(proveedorNotificaciones.llamadasMarcarTodas, 1);
+      expect(
+        find.descendant(of: botonCampana, matching: find.text('2')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: botonCampana, matching: find.text('1')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: botonCampana, matching: find.text('0')),
+        findsNothing,
+      );
+
+      // Cerrar el diálogo del centro de notificaciones
+      await tester.tap(find.widgetWithText(FilledButton, 'Cerrar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Incidencia reportada en FIE'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Comportamiento de notificaciones cuando no existe una sesión válida o el perfil está inactivo',
+    (WidgetTester tester) async {
+      // 1. En el servicio real sin sesión ni instancia de Supabase inicializada,
+      //    devuelve flujos vacíos (0 no leídas) sin lanzar excepción de inicialización.
+      ServicioNotificaciones.restaurarProveedor();
+      final listaSinSesion =
+          await ServicioNotificaciones.escucharNotificacionesPropias().first;
+      final conteoSinSesion =
+          await ServicioNotificaciones.escucharCantidadNoLeidas().first;
+      expect(listaSinSesion, isEmpty);
+      expect(conteoSinSesion, 0);
+      await expectLater(
+        ServicioNotificaciones.marcarComoLeida('noti-1'),
+        throwsA(isA<StateError>()),
+      );
+      await expectLater(
+        ServicioNotificaciones.marcarTodasComoLeidas(),
+        throwsA(isA<StateError>()),
+      );
+
+      // 2. En la interfaz sin sesión activa, no se expone el botón de notificaciones
+      final proveedorSinSesion = ProveedorAutenticacionSimulado(
+        sesionInicial: false,
+      );
+      addTearDown(proveedorSinSesion.liberar);
+      ServicioAutenticacion.configurarProveedorPrueba(proveedorSinSesion);
+      ServicioNotificaciones.configurarProveedorPrueba(
+        ProveedorNotificacionesSimulado(),
+      );
+
+      await tester.pumpWidget(const AplicacionPatitasEspoch());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PantallaBienvenida), findsOneWidget);
+      expect(find.byTooltip('Notificaciones'), findsNothing);
     },
   );
 }
