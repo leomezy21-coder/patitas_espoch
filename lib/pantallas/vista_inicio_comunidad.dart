@@ -4,14 +4,18 @@ import '../componentes/avistamientos_recientes.dart';
 import '../componentes/componentes_animales_patitas.dart';
 import '../componentes/componentes_autenticacion_patitas.dart';
 import '../modelos/animal_modelo.dart';
+import '../modelos/incidencia_modelo.dart';
 import '../modelos/perfil_usuario_modelo.dart';
 import '../servicios/servicio_animales.dart';
+import '../servicios/servicio_incidencias.dart';
 import '../tema/tema_patitas.dart';
 import 'pantalla_asignacion_roles.dart';
 import 'pantalla_escanear_qr.dart';
 import 'pantalla_ficha_animal.dart';
+import 'pantalla_gestion_incidencias.dart';
 import 'pantalla_registro_animal.dart';
 import 'pantalla_registro_avistamiento.dart';
+import 'pantalla_registro_incidencia.dart';
 import 'pantalla_reportes_animales.dart';
 import 'vista_catalogo_animales.dart';
 
@@ -43,94 +47,6 @@ class VistaInicioComunidad extends StatelessWidget {
     this.alAbrirModuloRol,
   });
 
-  /// Muestra una hoja informativa clara cuando se selecciona una funcion
-  /// cuya conexion con servicios remotos corresponde a etapas posteriores.
-  void _mostrarEstadoFuncionalidadPendiente(
-    BuildContext context, {
-    required IconData icono,
-    required Color colorIcono,
-    required Color colorFondoIcono,
-    required String titulo,
-    required String descripcion,
-    bool ofrecerIrAlCatalogo = true,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: TemaPatitas.colorCremaFondo,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (contextoHoja) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: TemaPatitas.colorBordeCampo,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: colorFondoIcono,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icono, size: 30, color: colorIcono),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  titulo,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    color: TemaPatitas.colorMarronOscuro,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  descripcion,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    color: TemaPatitas.colorTextoSecundario,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                if (ofrecerIrAlCatalogo) ...[
-                  OutlinedButton.icon(
-                    style: estiloBotonSecundarioVerde(),
-                    onPressed: () {
-                      Navigator.of(contextoHoja).pop();
-                      alAbrirCatalogo();
-                    },
-                    icon: const Icon(Icons.pets_rounded, size: 19),
-                    label: const Text('Ver fichas en el catálogo'),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                FilledButton(
-                  style: estiloBotonPrimarioNaranja(),
-                  onPressed: () => Navigator.of(contextoHoja).pop(),
-                  child: const Text('Entendido'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   /// El registro basico esta habilitado para los tres roles activos.
   void _gestionarAccesoAgregarAnimal(BuildContext context) {
     Navigator.of(context).push(
@@ -149,6 +65,23 @@ class VistaInicioComunidad extends StatelessWidget {
     if (guardado == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Avistamiento y fotografía guardados.')),
+      );
+    }
+  }
+
+  Future<void> _abrirRegistroIncidencia(BuildContext context) async {
+    final incidencia = await Navigator.of(context).push<IncidenciaModelo>(
+      MaterialPageRoute(
+        builder: (_) => PantallaRegistroIncidencia(perfil: perfil),
+      ),
+    );
+    if (incidencia != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Incidencia registrada con estado ${incidencia.estado.etiquetaVisible}.',
+          ),
+        ),
       );
     }
   }
@@ -185,6 +118,8 @@ class VistaInicioComunidad extends StatelessWidget {
                   alAbrirMapa: alAbrirMapa,
                   alAbrirRegistroAvistamiento: () =>
                       _abrirRegistroAvistamiento(context),
+                  alAbrirRegistroIncidencia: () =>
+                      _abrirRegistroIncidencia(context),
                   alAbrirEscaneoQr: () => _abrirEscaneoQr(context),
                   tarjetaAgregarAnimal: _construirTarjetaAgregarAnimal(
                     context,
@@ -389,6 +324,7 @@ class VistaInicioComunidad extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _BotonAccesoRapidoInicio(
+            key: const ValueKey('boton_reportar_incidencia'),
             etiqueta: 'Reportar\nincidencia',
             icono: Icons.medical_services_rounded,
             colorFondoTarjeta: const Color(0xFFFEEBD0),
@@ -396,17 +332,7 @@ class VistaInicioComunidad extends StatelessWidget {
             colorFondoIcono: const Color(0xFFFDD8A4),
             colorIcono: TemaPatitas.colorNaranjaPrimario,
             colorTexto: TemaPatitas.colorMarronOscuro,
-            alPresionar: () => _mostrarEstadoFuncionalidadPendiente(
-              context,
-              icono: Icons.medical_services_rounded,
-              colorIcono: TemaPatitas.colorNaranjaPrimario,
-              colorFondoIcono: const Color(0xFFFEEBD0),
-              titulo: 'Reporte de incidencia',
-              descripcion:
-                  'El registro de incidencias de salud o bienestar animal y '
-                  'la alerta al personal autorizado se habilitarán en el '
-                  'bloque de atención de incidencias.',
-            ),
+            alPresionar: () => _abrirRegistroIncidencia(context),
           ),
         ),
         const SizedBox(width: 8),
@@ -611,21 +537,53 @@ class _PanelInicioPersonalAutorizadoEstado
   String? _error;
   int _idConsulta = 0;
 
+  int? _incidenciasActivas;
+  bool _cargandoIncidencias = false;
+  int _idConsultaIncidencias = 0;
+
   @override
   void initState() {
     super.initState();
     _cargarAnimales();
+    _cargarIncidenciasActivas();
     ServicioAnimales.cambios.addListener(_alCambiarAnimales);
+    ServicioIncidencias.cambios.addListener(_alCambiarIncidencias);
   }
 
   @override
   void dispose() {
     ServicioAnimales.cambios.removeListener(_alCambiarAnimales);
+    ServicioIncidencias.cambios.removeListener(_alCambiarIncidencias);
     super.dispose();
   }
 
   void _alCambiarAnimales() {
     _cargarAnimales();
+  }
+
+  void _alCambiarIncidencias() {
+    _cargarIncidenciasActivas();
+  }
+
+  Future<void> _cargarIncidenciasActivas() async {
+    final consultaActual = ++_idConsultaIncidencias;
+    setState(() {
+      _cargandoIncidencias = true;
+    });
+    try {
+      final lista = await ServicioIncidencias.proveedor.listar();
+      if (!mounted || consultaActual != _idConsultaIncidencias) return;
+      setState(() {
+        _incidenciasActivas = lista.where((i) => i.estaActiva).length;
+        _cargandoIncidencias = false;
+      });
+    } catch (_) {
+      if (!mounted || consultaActual != _idConsultaIncidencias) return;
+      setState(() {
+        _incidenciasActivas = null;
+        _cargandoIncidencias = false;
+      });
+    }
   }
 
   Future<void> _cargarAnimales() async {
@@ -672,6 +630,20 @@ class _PanelInicioPersonalAutorizadoEstado
     }
   }
 
+  Future<void> _abrirGestionIncidencias() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PantallaGestionIncidencias(
+          perfil: widget.perfil,
+          soloActivasInicial: true,
+        ),
+      ),
+    );
+    if (mounted) {
+      _cargarIncidenciasActivas();
+    }
+  }
+
   Future<void> _abrirFichaAnimal(AnimalModelo animal) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -710,15 +682,17 @@ class _PanelInicioPersonalAutorizadoEstado
           alPresionar: _abrirListadoRevision,
         ),
         const SizedBox(height: 12),
-        const _TarjetaResumenPersonalAutorizado(
-          key: ValueKey('tarjeta_pa_incidencias_activas'),
+        _TarjetaResumenPersonalAutorizado(
+          key: const ValueKey('tarjeta_pa_incidencias_activas'),
           titulo: 'Incidencias activas',
           subtitulo: 'Reportes por atender',
           icono: Icons.warning_amber_rounded,
-          colorFondoIcono: Color(0xFFBCE3F5),
-          colorIcono: Color(0xFF4E2509),
-          habilitada: false,
-          etiquetaDeshabilitada: 'Próximamente',
+          colorFondoIcono: const Color(0xFFBCE3F5),
+          colorIcono: const Color(0xFF4E2509),
+          contadorReal: _incidenciasActivas,
+          cargando: _cargandoIncidencias,
+          habilitada: true,
+          alPresionar: _abrirGestionIncidencias,
         ),
         const SizedBox(height: 12),
         const _TarjetaResumenPersonalAutorizado(
@@ -966,6 +940,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
   final PerfilUsuarioModelo perfil;
   final VoidCallback alAbrirMapa;
   final VoidCallback alAbrirRegistroAvistamiento;
+  final VoidCallback alAbrirRegistroIncidencia;
   final VoidCallback alAbrirEscaneoQr;
   final Widget tarjetaAgregarAnimal;
 
@@ -973,6 +948,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
     required this.perfil,
     required this.alAbrirMapa,
     required this.alAbrirRegistroAvistamiento,
+    required this.alAbrirRegistroIncidencia,
     required this.alAbrirEscaneoQr,
     required this.tarjetaAgregarAnimal,
   });
@@ -983,6 +959,17 @@ class _PanelInicioAdministrador extends StatelessWidget {
         builder: (_) => PantallaReportesAnimales(
           perfil: perfil,
           soloRegistrosPendientesRevision: true,
+        ),
+      ),
+    );
+  }
+
+  void _abrirGestionIncidencias(BuildContext context) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PantallaGestionIncidencias(
+          perfil: perfil,
+          soloActivasInicial: true,
         ),
       ),
     );
@@ -1218,16 +1205,16 @@ class _PanelInicioAdministrador extends StatelessWidget {
             alPresionar: () => _abrirRevisionAnimales(context),
           ),
           const SizedBox(height: 10),
-          const _TarjetaResumenPersonalAutorizado(
-            key: ValueKey('tarjeta_admin_incidencias_activas'),
+          _TarjetaResumenPersonalAutorizado(
+            key: const ValueKey('tarjeta_admin_incidencias_activas'),
             titulo: 'Incidencias activas',
             subtitulo: 'Reportes por atender',
             icono: Icons.warning_amber_rounded,
-            colorFondoIcono: Color(0xFFBCE3F5),
-            colorIcono: Color(0xFF4E2509),
-            habilitada: false,
+            colorFondoIcono: const Color(0xFFBCE3F5),
+            colorIcono: const Color(0xFF4E2509),
+            habilitada: true,
             permitirCrecimientoVertical: true,
-            etiquetaDeshabilitada: 'Próximamente',
+            alPresionar: () => _abrirGestionIncidencias(context),
           ),
           const SizedBox(height: 10),
           const _TarjetaResumenPersonalAutorizado(
@@ -1307,19 +1294,18 @@ class _PanelInicioAdministrador extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: _BotonAccesoRapidoInicio(
-                  key: ValueKey('boton_admin_reportar_incidencia'),
+                  key: const ValueKey('boton_admin_reportar_incidencia'),
                   etiqueta: 'Reportar\nincidencia',
                   icono: Icons.medical_services_rounded,
-                  colorFondoTarjeta: Color(0xFFFEEBD0),
-                  colorBordeTarjeta: Color(0xFFF9D5A2),
-                  colorFondoIcono: Color(0xFFFDD8A4),
+                  colorFondoTarjeta: const Color(0xFFFEEBD0),
+                  colorBordeTarjeta: const Color(0xFFF9D5A2),
+                  colorFondoIcono: const Color(0xFFFDD8A4),
                   colorIcono: TemaPatitas.colorNaranjaPrimario,
                   colorTexto: TemaPatitas.colorMarronOscuro,
-                  habilitado: false,
                   permitirCrecimientoVertical: true,
-                  etiquetaDeshabilitada: 'Próximamente',
+                  alPresionar: alAbrirRegistroIncidencia,
                 ),
               ),
             ],
@@ -1686,9 +1672,7 @@ class _BotonAccesoRapidoInicio extends StatelessWidget {
   final Color colorFondoIcono;
   final Color colorIcono;
   final Color colorTexto;
-  final bool habilitado;
   final bool permitirCrecimientoVertical;
-  final String? etiquetaDeshabilitada;
   final VoidCallback? alPresionar;
 
   const _BotonAccesoRapidoInicio({
@@ -1700,82 +1684,54 @@ class _BotonAccesoRapidoInicio extends StatelessWidget {
     required this.colorFondoIcono,
     required this.colorIcono,
     required this.colorTexto,
-    this.habilitado = true,
     this.permitirCrecimientoVertical = false,
-    this.etiquetaDeshabilitada,
     this.alPresionar,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: habilitado ? 1.0 : 0.78,
-      child: Material(
-        color: colorFondoTarjeta,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: colorBordeTarjeta, width: 1.2),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: habilitado ? alPresionar : null,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: permitirCrecimientoVertical ? 10 : 6,
-              vertical: permitirCrecimientoVertical ? 12 : 10,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: colorFondoIcono,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(icono, color: colorIcono, size: 24),
+    return Material(
+      color: colorFondoTarjeta,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: colorBordeTarjeta, width: 1.2),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: alPresionar,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: permitirCrecimientoVertical ? 10 : 6,
+            vertical: permitirCrecimientoVertical ? 12 : 10,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colorFondoIcono,
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                const SizedBox(height: 7),
-                Text(
-                  etiqueta,
-                  textAlign: TextAlign.center,
-                  maxLines: permitirCrecimientoVertical ? null : 2,
-                  overflow: permitirCrecimientoVertical
-                      ? TextOverflow.visible
-                      : TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: permitirCrecimientoVertical ? 12 : 11.5,
-                    fontWeight: FontWeight.w800,
-                    color: colorTexto,
-                    height: 1.18,
-                  ),
+                child: Icon(icono, color: colorIcono, size: 24),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                etiqueta,
+                textAlign: TextAlign.center,
+                maxLines: permitirCrecimientoVertical ? null : 2,
+                overflow: permitirCrecimientoVertical
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: permitirCrecimientoVertical ? 12 : 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: colorTexto,
+                  height: 1.18,
                 ),
-                if (!habilitado && etiquetaDeshabilitada != null) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      etiquetaDeshabilitada!,
-                      softWrap: false,
-                      maxLines: 1,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: TemaPatitas.colorMarronMedio,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

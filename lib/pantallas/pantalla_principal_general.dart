@@ -9,6 +9,7 @@ import 'vista_inicio_comunidad.dart';
 import 'vista_mapa_campus.dart';
 import 'pantalla_reportes_animales.dart';
 import 'pantalla_asignacion_roles.dart';
+import 'pantalla_gestion_incidencias.dart';
 //notificacion push
 import '../servicios/servicio_notificaciones.dart';
 
@@ -919,6 +920,21 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
+                key: const ValueKey('boton_perfil_incidencias'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PantallaGestionIncidencias(perfil: perfil),
+                  ),
+                ),
+                icon: const Icon(Icons.medical_services_outlined),
+                label: Text(
+                  perfil.rol.puedeGestionarEstadoIncidencias
+                      ? 'Incidencias del campus'
+                      : 'Mis incidencias',
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
                 style: estiloBotonSecundarioVerde(),
                 onPressed: _cargandoPerfil ? null : _cargarPerfilUsuario,
                 icon: const Icon(Icons.refresh_rounded, size: 20),
@@ -1097,6 +1113,19 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
           icon: const Icon(Icons.fact_check_outlined),
           label: const Text('Evaluar fichas de animales'),
         ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const ValueKey('boton_gestion_incidencias'),
+          style: estiloBotonPrimarioNaranja(),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  PantallaGestionIncidencias(perfil: _resultadoPerfil!.perfil!),
+            ),
+          ),
+          icon: const Icon(Icons.warning_amber_rounded),
+          label: const Text('Gestionar incidencias'),
+        ),
         const SizedBox(height: 16),
         _construirTarjetaPermisoRol(
           categoria: 'Fichas y Salud Animal',
@@ -1146,6 +1175,19 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
           ),
           icon: const Icon(Icons.manage_accounts_outlined),
           label: const Text('Asignación de roles'),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const ValueKey('boton_admin_incidencias'),
+          style: estiloBotonPrimarioNaranja(),
+          onPressed: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) =>
+                  PantallaGestionIncidencias(perfil: _resultadoPerfil!.perfil!),
+            ),
+          ),
+          icon: const Icon(Icons.warning_amber_rounded),
+          label: const Text('Supervisar incidencias'),
         ),
         const SizedBox(height: 12),
         _construirTarjetaPermisoRol(
