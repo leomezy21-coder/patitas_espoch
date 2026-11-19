@@ -88,5 +88,88 @@ class ProveedorAnimalesMemoria implements ProveedorAnimales {
     String? idVacunacion,
     String? nombreVacuna,
     String? fecha,
-  }) async {}
+    String? proximaDosis,
+  }) async {
+    if (fallar) throw const ErrorAnimales('Error de conexión de prueba');
+    animales = animales.map((a) {
+      if (a.id != id) return a;
+      final historial = List<VacunacionAnimal>.from(a.historialVacunaciones);
+      final tieneNombre =
+          nombreVacuna != null && nombreVacuna.trim().isNotEmpty;
+      final tieneFechaAplicada = fecha != null && fecha.trim().isNotEmpty;
+      final tieneFechaProxima =
+          proximaDosis != null && proximaDosis.trim().isNotEmpty;
+
+      if (tieneNombre && (tieneFechaAplicada || tieneFechaProxima)) {
+        if (tieneFechaAplicada &&
+            tieneFechaProxima &&
+            proximaDosis.trim().compareTo(fecha.trim()) <= 0) {
+          throw const ErrorAnimales(
+            'La fecha de la próxima dosis debe ser posterior a la fecha de aplicación.',
+          );
+        }
+        final nueva = VacunacionAnimal(
+          id: idVacunacion ?? 'vac-${historial.length + 1}',
+          nombre: nombreVacuna.trim(),
+          fecha: tieneFechaAplicada ? fecha.trim() : '',
+          proximaDosis: tieneFechaProxima ? proximaDosis.trim() : null,
+          observaciones: observacion.trim(),
+        );
+        if (idVacunacion == null) {
+          historial.insert(0, nueva);
+        } else {
+          final indice = historial.indexWhere((v) => v.id == idVacunacion);
+          if (indice < 0) {
+            throw const ErrorAnimales(
+              'La vacunación no pertenece a esta ficha.',
+            );
+          }
+          historial[indice] = nueva;
+        }
+      }
+      if (estado == 'favorable' && !historial.any((v) => v.esAplicada)) {
+        throw const ErrorAnimales(
+          'Registra o verifica al menos una vacuna aplicada antes de validar.',
+        );
+      }
+      final estadoGeneralServidor = a.revisionAdministrativa == 'rechazada'
+          ? 'rechazado'
+          : a.revisionAdministrativa != 'aprobada'
+          ? 'pendiente'
+          : (estado == 'desfavorable' ||
+                a.estadoComportamiento == 'desfavorable')
+          ? 'requiere_atencion'
+          : (estado == 'favorable' && a.estadoComportamiento == 'favorable')
+          ? 'seguro'
+          : 'pendiente';
+      return AnimalModelo(
+        id: a.id,
+        identificador: a.identificador,
+        nombre: a.nombre,
+        especie: a.especie,
+        raza: a.raza,
+        sexo: a.sexo,
+        caracteristicasFisicas: a.caracteristicasFisicas,
+        zonaHabitual: a.zonaHabitual,
+        idZonaHabitual: a.idZonaHabitual,
+        urlFotografia: a.urlFotografia,
+        comportamiento: a.comportamiento,
+        recomendaciones: a.recomendaciones,
+        vacunasAplicadas: historial
+            .where((v) => v.esAplicada)
+            .map((v) => v.texto)
+            .toList(),
+        ultimoAvistamiento: a.ultimoAvistamiento,
+        activo: a.activo,
+        revisionAdministrativa: a.revisionAdministrativa,
+        estadoVacunacion: estado,
+        estadoComportamiento: a.estadoComportamiento,
+        estadoGeneralServidor: estadoGeneralServidor,
+        observacionRevision: a.observacionRevision,
+        observacionVacunacion: observacion,
+        historialVacunaciones: historial,
+        esDemostracion: a.esDemostracion,
+      );
+    }).toList();
+  }
 }

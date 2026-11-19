@@ -105,7 +105,10 @@ class AnimalModelo {
       urlFotografia: texto('url_fotografia'),
       comportamiento: texto('comportamiento'),
       recomendaciones: texto('recomendaciones'),
-      vacunasAplicadas: historial.map((v) => v.texto).toList(),
+      vacunasAplicadas: historial
+          .where((v) => v.esAplicada)
+          .map((v) => v.texto)
+          .toList(),
       ultimoAvistamiento: texto('ultimo_avistamiento'),
       activo: datos['activo'] as bool,
       revisionAdministrativa: texto('revision_administrativa'),
@@ -191,23 +194,67 @@ class AnimalModelo {
   }
 }
 
+/// Modalidades oficiales de registro de vacunas según el diseño de Figma (V01).
+enum ModalidadVacunacion {
+  /// Vacuna que ya fue administrada al animal comunitario.
+  aplicada,
+
+  /// Vacuna programada para aplicarse en una fecha futura.
+  programada,
+}
+
 class VacunacionAnimal {
   final String id;
   final String nombre;
   final String fecha;
+  final String? proximaDosis;
   final String observaciones;
   const VacunacionAnimal({
     required this.id,
     required this.nombre,
     required this.fecha,
+    this.proximaDosis,
     this.observaciones = '',
   });
-  factory VacunacionAnimal.desdeMapa(Map<String, dynamic> mapa) =>
-      VacunacionAnimal(
-        id: mapa['id_vacunacion']?.toString() ?? '',
-        nombre: mapa['nombre']?.toString() ?? '',
-        fecha: mapa['fecha_aplicacion']?.toString() ?? '',
-        observaciones: mapa['observaciones']?.toString() ?? '',
-      );
-  String get texto => '$nombre ($fecha)';
+  factory VacunacionAnimal.desdeMapa(Map<String, dynamic> mapa) {
+    final fechaCruda = mapa['fecha_aplicacion']?.toString().trim() ?? '';
+    final proximaCruda = mapa['proxima_dosis']?.toString().trim();
+    return VacunacionAnimal(
+      id: mapa['id_vacunacion']?.toString() ?? '',
+      nombre: mapa['nombre']?.toString() ?? '',
+      fecha: fechaCruda,
+      proximaDosis: (proximaCruda == null || proximaCruda.isEmpty)
+          ? null
+          : proximaCruda,
+      observaciones: mapa['observaciones']?.toString() ?? '',
+    );
+  }
+
+  /// Indica si la vacuna ya fue realmente administrada al animal.
+  bool get esAplicada => fecha.trim().isNotEmpty;
+
+  /// Indica si existe una fecha de próxima dosis o fecha programada.
+  bool get tieneProximaDosis =>
+      proximaDosis != null && proximaDosis!.trim().isNotEmpty;
+
+  /// Indica si el registro corresponde a una vacuna programada a futuro aún no aplicada.
+  bool get esProgramada => !esAplicada && tieneProximaDosis;
+
+  ModalidadVacunacion get modalidad => esProgramada
+      ? ModalidadVacunacion.programada
+      : ModalidadVacunacion.aplicada;
+
+  String get etiquetaEstado => esProgramada ? 'Programada' : 'Aplicada';
+
+  String get fechaPrincipal =>
+      esAplicada ? fecha.trim() : (proximaDosis?.trim() ?? '');
+
+  String get texto {
+    if (esProgramada) {
+      return '$nombre (Programada: ${proximaDosis!.trim()})';
+    }
+    return tieneProximaDosis
+        ? '$nombre ($fecha) · Próxima dosis: ${proximaDosis!.trim()}'
+        : '$nombre ($fecha)';
+  }
 }

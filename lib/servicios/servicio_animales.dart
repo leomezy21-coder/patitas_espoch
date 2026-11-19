@@ -59,6 +59,7 @@ abstract class ProveedorAnimales {
     String? idVacunacion,
     String? nombreVacuna,
     String? fecha,
+    String? proximaDosis,
   });
 }
 
@@ -207,6 +208,7 @@ class _ProveedorAnimalesSupabase implements ProveedorAnimales {
     String? idVacunacion,
     String? nombreVacuna,
     String? fecha,
+    String? proximaDosis,
   }) async {
     await _rpc('validar_vacunacion_animal', {
       'p_id_animal': id,
@@ -215,6 +217,8 @@ class _ProveedorAnimalesSupabase implements ProveedorAnimales {
       'p_id_vacunacion': idVacunacion,
       'p_nombre_vacuna': nombreVacuna,
       'p_fecha': fecha,
+      if (proximaDosis != null || idVacunacion != null)
+        'p_proxima_dosis': proximaDosis,
     });
   }
 }

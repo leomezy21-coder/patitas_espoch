@@ -389,16 +389,14 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               style: FilledButton.styleFrom(
                                 backgroundColor: ColoresAnimalesPatitas.naranja,
                                 foregroundColor: Colors.white,
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                minimumSize: const Size(0, 42),
+                                minimumSize: const Size(48, 50),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
+                                  horizontal: 18,
+                                  vertical: 12,
                                 ),
                                 textStyle: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(18),
@@ -406,14 +404,14 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               ),
                               icon: const Icon(
                                 Icons.add_location_alt_outlined,
-                                size: 18,
+                                size: 20,
                               ),
                               label: const Text(
                                 'Reportar avistamiento',
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             OutlinedButton.icon(
                               key: const ValueKey(
                                 'trazar_ruta_ultimo_avistamiento',
@@ -426,19 +424,18 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: ColoresAnimalesPatitas.verde,
                                 backgroundColor: Colors.white,
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                minimumSize: const Size(0, 40),
+                                minimumSize: const Size(48, 50),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
+                                  horizontal: 18,
+                                  vertical: 12,
                                 ),
                                 textStyle: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
                                 ),
                                 side: const BorderSide(
                                   color: ColoresAnimalesPatitas.verde,
+                                  width: 1.5,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(18),
@@ -446,22 +443,22 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               ),
                               icon: _probandoRuta
                                   ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
+                                      width: 18,
+                                      height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                       ),
                                     )
                                   : const Icon(
                                       Icons.directions_walk_rounded,
-                                      size: 18,
+                                      size: 20,
                                     ),
                               label: const Text(
                                 'Trazar ruta al último avistamiento',
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             TextButton.icon(
                               key: const ValueKey(
                                 'volver_catalogo_desde_ficha',
@@ -469,21 +466,19 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
                               onPressed: () => Navigator.of(context).maybePop(),
                               style: TextButton.styleFrom(
                                 foregroundColor: ColoresAnimalesPatitas.verde,
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                minimumSize: const Size(0, 36),
+                                minimumSize: const Size(48, 48),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
+                                  horizontal: 14,
+                                  vertical: 10,
                                 ),
                                 textStyle: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                               icon: const Icon(
                                 Icons.arrow_back_rounded,
-                                size: 18,
+                                size: 20,
                               ),
                               label: const Text('Volver al catálogo'),
                             ),
@@ -500,113 +495,215 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
 
   Widget _construirAccionesSuperioresFicha() {
     final perfilActual = widget.perfil!;
-    final botonesSecundarios = <Widget>[
+    final accionesRol = <Widget>[
       if (perfilActual.rol == RolUsuario.administrador && !animal.esDemostracion)
         _construirBotonAccionSecundaria(
           etiqueta: 'Asignar zona habitual',
+          subtitulo: 'Definir el sector de referencia del animal en el campus',
           icono: Icons.place_outlined,
+          colorFondoIcono: const Color(0xFFDFF2FE),
+          colorIcono: const Color(0xFF0369A1),
           alPresionar: _asignarZonaHabitual,
         ),
       if (perfilActual.rol.puedeRevisarRegistros)
         _construirBotonAccionSecundaria(
           etiqueta: 'Revisar registro básico',
-          icono: Icons.description_outlined,
+          subtitulo: 'Aprobar o rechazar datos iniciales y fotografía',
+          icono: Icons.fact_check_outlined,
+          colorFondoIcono: const Color(0xFFFBE29D),
+          colorIcono: ColoresAnimalesPatitas.cafe,
           alPresionar: () => _evaluar(TipoEvaluacionAnimal.revision),
         ),
       if (perfilActual.rol.puedeValidarSalud) ...[
         _construirBotonAccionSecundaria(
           etiqueta: 'Evaluar vacunación',
-          icono: Icons.vaccines_outlined,
+          subtitulo:
+              'Registrar vacunas aplicadas, programar dosis y validar estado',
+          icono: Icons.vaccines_rounded,
+          colorFondoIcono: const Color(0xFFD8F3DC),
+          colorIcono: const Color(0xFF1B4332),
           alPresionar: () => _evaluar(TipoEvaluacionAnimal.vacunacion),
         ),
         _construirBotonAccionSecundaria(
           etiqueta: 'Evaluar comportamiento',
-          icono: Icons.pets_outlined,
+          subtitulo: 'Registrar evaluación conductual y recomendaciones',
+          icono: Icons.pets_rounded,
+          colorFondoIcono: const Color(0xFFFDE2B8),
+          colorIcono: ColoresAnimalesPatitas.cafe,
           alPresionar: () => _evaluar(TipoEvaluacionAnimal.comportamiento),
         ),
       ],
     ];
 
+    final tituloSeccionRol = perfilActual.rol.puedeValidarSalud
+        ? 'Acciones de personal autorizado'
+        : 'Acciones de administración';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => Scaffold(
-                appBar: AppBar(
-                  title: Text('Avistamientos de ${animal.nombre}'),
-                ),
-                body: SafeArea(
-                  child: ListView(
-                    children: [
-                      AvistamientosRecientes(
-                        perfil: perfilActual,
-                        idAnimal: animal.id,
-                        limite: 100,
-                        maximoVisible: 100,
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'Se muestran hasta 100 reportes recientes disponibles de este animal.',
+        // 1. Acción de consulta general equilibrada (disponible para todos los roles)
+        Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: ColoresAnimalesPatitas.verde.withValues(alpha: 0.45),
+              width: 1.4,
+            ),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(
+                    title: Text('Avistamientos de ${animal.nombre}'),
+                  ),
+                  body: SafeArea(
+                    child: ListView(
+                      children: [
+                        AvistamientosRecientes(
+                          perfil: perfilActual,
+                          idAnimal: animal.id,
+                          limite: 100,
+                          maximoVisible: 100,
                         ),
-                      ),
-                    ],
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text(
+                            'Se muestran hasta 100 reportes recientes disponibles de este animal.',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          style: FilledButton.styleFrom(
-            backgroundColor: ColoresAnimalesPatitas.verde,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            visualDensity: VisualDensity.compact,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            minimumSize: const Size(0, 40),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            textStyle: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: ColoresAnimalesPatitas.menta,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.location_searching_rounded,
+                        size: 21,
+                        color: ColoresAnimalesPatitas.verde,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Consultar avistamientos',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: ColoresAnimalesPatitas.cafe,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Ver historial de ubicaciones reportadas en el campus',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ColoresAnimalesPatitas.texto,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: ColoresAnimalesPatitas.verde,
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          icon: const Icon(Icons.location_searching_rounded, size: 18),
-          label: const Text(
-            'Consultar avistamientos',
-            textAlign: TextAlign.center,
           ),
         ),
-        if (botonesSecundarios.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (contexto, limites) {
-              final usarDosColumnas =
-                  botonesSecundarios.length == 2 &&
-                  limites.maxWidth >= 340 &&
-                  MediaQuery.textScalerOf(contexto).scale(12.5) <= 16.0;
-              if (usarDosColumnas) {
-                return Row(
+
+        // 2. Panel diferenciado para las acciones exclusivas del rol autorizado
+        if (accionesRol.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8EE),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE8D1B5), width: 1.3),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    Expanded(child: botonesSecundarios[0]),
-                    const SizedBox(width: 8),
-                    Expanded(child: botonesSecundarios[1]),
+                    Icon(
+                      perfilActual.rol.puedeValidarSalud
+                          ? Icons.medical_services_outlined
+                          : Icons.admin_panel_settings_outlined,
+                      size: 18,
+                      color: ColoresAnimalesPatitas.verde,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        tituloSeccionRol,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: ColoresAnimalesPatitas.verde,
+                        ),
+                      ),
+                    ),
                   ],
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < botonesSecundarios.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 6),
-                    botonesSecundarios[i],
-                  ],
-                ],
-              );
-            },
+                ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (contexto, limites) {
+                    final usarDosColumnas =
+                        accionesRol.length == 2 &&
+                        limites.maxWidth >= 560 &&
+                        MediaQuery.textScalerOf(contexto).scale(14) <= 16.5;
+                    if (usarDosColumnas) {
+                      return Row(
+                        children: [
+                          Expanded(child: accionesRol[0]),
+                          const SizedBox(width: 10),
+                          Expanded(child: accionesRol[1]),
+                        ],
+                      );
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < accionesRol.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 10),
+                          accionesRol[i],
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ],
@@ -615,29 +712,73 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
 
   Widget _construirBotonAccionSecundaria({
     required String etiqueta,
+    required String subtitulo,
     required IconData icono,
+    required Color colorFondoIcono,
+    required Color colorIcono,
     required VoidCallback alPresionar,
   }) {
-    return OutlinedButton.icon(
-      onPressed: alPresionar,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: ColoresAnimalesPatitas.cafe,
-        backgroundColor: Colors.white,
-        visualDensity: VisualDensity.compact,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        minimumSize: const Size(0, 36),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        textStyle: const TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-        ),
-        side: const BorderSide(color: ColoresAnimalesPatitas.borde),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: ColoresAnimalesPatitas.borde, width: 1.2),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: alPresionar,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 58),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colorFondoIcono,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(icono, size: 22, color: colorIcono),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        etiqueta,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: ColoresAnimalesPatitas.cafe,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitulo,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: ColoresAnimalesPatitas.texto,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: ColoresAnimalesPatitas.cafe,
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      icon: Icon(icono, size: 16.5, color: ColoresAnimalesPatitas.verde),
-      label: Text(etiqueta, textAlign: TextAlign.center),
     );
   }
 
@@ -753,10 +894,19 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
   }
 
   Widget _construirVacunasYCuidados() {
-    final registros = animal.vacunasAplicadas
-        .map((registro) => registro.trim())
-        .where((registro) => registro.isNotEmpty)
-        .toList();
+    final registros = animal.historialVacunaciones.isNotEmpty
+        ? animal.historialVacunaciones
+              .map(
+                (v) => v.esProgramada
+                    ? '${v.nombre} (Programada: ${v.proximaDosis!.trim()}) · Estado: Programada'
+                    : '${v.nombre} (${v.fecha}) · Próxima dosis: '
+                          '${v.tieneProximaDosis ? v.proximaDosis!.trim() : 'Sin programar'}',
+              )
+              .toList()
+        : animal.vacunasAplicadas
+              .map((registro) => registro.trim())
+              .where((registro) => registro.isNotEmpty)
+              .toList();
     return _TarjetaInformacionAnimal(
       titulo: 'Vacunas y cuidados',
       icono: Icons.medical_services_outlined,
