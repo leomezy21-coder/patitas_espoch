@@ -39,7 +39,7 @@ abstract class ProveedorRutas {
 }
 
 abstract final class ServicioRutas {
-  static ProveedorRutas _proveedor = const _ProveedorRutasSupabase();
+  static ProveedorRutas _proveedor = const ProveedorRutasSupabase();
 
   static ProveedorRutas get proveedor => _proveedor;
 
@@ -50,7 +50,7 @@ abstract final class ServicioRutas {
 
   @visibleForTesting
   static void restaurarProveedor() {
-    _proveedor = const _ProveedorRutasSupabase();
+    _proveedor = const ProveedorRutasSupabase();
   }
 
   /// Verifica que un par de coordenadas sea finito y esté dentro de rangos geográficos válidos.
@@ -109,36 +109,63 @@ abstract final class ServicioRutas {
   }
 }
 
-class _ProveedorRutasSupabase implements ProveedorRutas {
-  const _ProveedorRutasSupabase();
+typedef InvocarFuncionRuta = Future<FunctionResponse> Function(
+  String nombreFuncion,
+  Map<String, dynamic> cuerpo,
+);
+
+typedef VerificarSesionActivaRuta = bool Function();
+
+class ProveedorRutasSupabase implements ProveedorRutas {
+  final InvocarFuncionRuta? invocar;
+  final VerificarSesionActivaRuta? tieneSesionActiva;
+
+  const ProveedorRutasSupabase({
+    this.invocar,
+    this.tieneSesionActiva,
+  });
 
   @override
   Future<RutaCalculada> calcular({
     required LatLng origen,
     required LatLng destino,
   }) async {
-    if (!ConfiguracionSupabase.estaInicializado) {
+    if (!ServicioRutas.coordenadasValidas(origen) ||
+        !ServicioRutas.coordenadasValidas(destino)) {
+      throw const ErrorRutas(
+        'Las coordenadas de origen o del avistamiento no son válidas para calcular la ruta.',
+      );
+    }
+
+    if (invocar == null && !ConfiguracionSupabase.estaInicializado) {
       throw const ErrorRutas(
         'El servicio de rutas no está conectado al servidor. Verifica tu conexión e inténtalo de nuevo.',
       );
     }
 
-    final cliente = Supabase.instance.client;
+    final sesionActiva = tieneSesionActiva != null
+        ? tieneSesionActiva!()
+        : (ConfiguracionSupabase.estaInicializado &&
+              Supabase.instance.client.auth.currentSession != null);
 
-    if (cliente.auth.currentSession == null) {
+    if (!sesionActiva) {
       throw const ErrorRutas(
         'Debes iniciar sesión para calcular rutas.',
       );
     }
 
+    final cuerpo = <String, dynamic>{
+      'origen': {'lat': origen.latitude, 'lon': origen.longitude},
+      'destino': {'lat': destino.latitude, 'lon': destino.longitude},
+    };
+
     try {
-      final respuesta = await cliente.functions.invoke(
-        'calcular-ruta',
-        body: {
-          'origen': {'lat': origen.latitude, 'lon': origen.longitude},
-          'destino': {'lat': destino.latitude, 'lon': destino.longitude},
-        },
-      );
+      final respuesta = invocar != null
+          ? await invocar!('calcular-ruta', cuerpo)
+          : await Supabase.instance.client.functions.invoke(
+              'calcular-ruta',
+              body: cuerpo,
+            );
 
       final datos = respuesta.data;
 
@@ -179,7 +206,12 @@ class _ProveedorRutasSupabase implements ProveedorRutas {
 
       final distancia = datos['distanciaMetros'];
       final duracion = datos['duracionSegundos'];
-      if (distancia is! num || duracion is! num) {
+      if (distancia is! num ||
+          duracion is! num ||
+          !distancia.toDouble().isFinite ||
+          !duracion.toDouble().isFinite ||
+          distancia.toDouble() < 0 ||
+          duracion.toDouble() < 0) {
         throw const ErrorRutas(
           'OpenRouteService no devolvió la distancia o duración de la ruta.',
         );

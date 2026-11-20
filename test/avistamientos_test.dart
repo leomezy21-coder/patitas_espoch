@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:patitas_espoch/componentes/avistamientos_recientes.dart';
 import 'package:patitas_espoch/modelos/animal_modelo.dart';
 import 'package:patitas_espoch/modelos/avistamiento_modelo.dart';
@@ -387,6 +389,281 @@ void main() {
       expect(rutas.llamadasCalcular, 1);
       expect(find.text('Ruta hacia Canela'), findsOneWidget);
       expect(find.byKey(const Key('tarjeta_resumen_ruta_mapa')), findsOneWidget);
+    },
+  );
+
+  test(
+    'G08: ServicioRutas y ProveedorRutasSupabase validan coordenadas, sesion, contrato JSON de calcular-ruta, puntos, distancia, duracion y errores',
+    () async {
+      const origenValido = LatLng(-1.6548, -78.6795);
+      const destinoValido = LatLng(-1.6555, -78.6802);
+
+      // 1. Coordenadas válidas vs. coordenadas inválidas
+      expect(ServicioRutas.coordenadasValidas(origenValido), isTrue);
+      expect(ServicioRutas.coordenadasValidas(null), isFalse);
+      expect(ServicioRutas.coordenadasValidas(const LatLng(0.0, 0.0)), isFalse);
+      expect(
+        ServicioRutas.coordenadasValidas(const LatLng(95.0, -78.6)),
+        isFalse,
+      );
+      expect(
+        ServicioRutas.coordenadasValidas(const LatLng(-1.65, -185.0)),
+        isFalse,
+      );
+      expect(
+        ServicioRutas.coordenadasValidas(const LatLng(double.nan, -78.6)),
+        isFalse,
+      );
+
+      await expectLater(
+        ServicioRutas.calcular(
+          origen: const LatLng(91.0, -78.6795),
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('Las coordenadas de origen o del avistamiento no son válidas'),
+          ),
+        ),
+      );
+
+      // 2. Usuario sin sesión activa
+      final proveedorSinSesion = ProveedorRutasSupabase(
+        tieneSesionActiva: () => false,
+        invocar: (_, _) async => FunctionResponse(status: 200, data: const {}),
+      );
+      await expectLater(
+        proveedorSinSesion.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('Debes iniciar sesión para calcular rutas.'),
+          ),
+        ),
+      );
+
+      // 3. Respuesta válida respetando el contrato exacto de calcular-ruta
+      String? funcionInvocada;
+      Map<String, dynamic>? cuerpoEnviado;
+      final proveedorExitoso = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (nombre, cuerpo) async {
+          funcionInvocada = nombre;
+          cuerpoEnviado = cuerpo;
+          return FunctionResponse(
+            status: 200,
+            data: <String, dynamic>{
+              'success': true,
+              'puntos': <List<double>>[
+                [-1.6548, -78.6795],
+                [-1.6551, -78.6799],
+                [-1.6555, -78.6802],
+              ],
+              'distanciaMetros': 412.5,
+              'duracionSegundos': 297.0,
+            },
+          );
+        },
+      );
+
+      final ruta = await proveedorExitoso.calcular(
+        origen: origenValido,
+        destino: destinoValido,
+      );
+      expect(funcionInvocada, 'calcular-ruta');
+      expect(cuerpoEnviado, <String, dynamic>{
+        'origen': {'lat': -1.6548, 'lon': -78.6795},
+        'destino': {'lat': -1.6555, 'lon': -78.6802},
+      });
+      expect(ruta.puntos, hasLength(3));
+      expect(ruta.puntos.first.latitude, closeTo(-1.6548, 0.00001));
+      expect(ruta.puntos.last.longitude, closeTo(-78.6802, 0.00001));
+      expect(ruta.distanciaMetros, 412.5);
+      expect(ruta.duracionSegundos, 297.0);
+
+      // 4. Respuesta con error de negocio desde la Edge Function (404 / 502 / success: false)
+      final proveedorErrorRespuesta = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async => FunctionResponse(
+          status: 404,
+          data: const <String, dynamic>{
+            'error': 'No existe una ruta disponible',
+          },
+        ),
+      );
+      await expectLater(
+        proveedorErrorRespuesta.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            'No existe una ruta disponible',
+          ),
+        ),
+      );
+
+      // 5. Puntos mal formados o insuficientes (< 2 puntos o coordenadas no numéricas)
+      final proveedorPocosPuntos = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async => FunctionResponse(
+          status: 200,
+          data: const <String, dynamic>{
+            'success': true,
+            'puntos': <List<double>>[
+              [-1.6548, -78.6795],
+            ],
+            'distanciaMetros': 10,
+            'duracionSegundos': 8,
+          },
+        ),
+      );
+      await expectLater(
+        proveedorPocosPuntos.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('OpenRouteService devolvió una ruta inválida'),
+          ),
+        ),
+      );
+
+      final proveedorPuntosInvalidos = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async => FunctionResponse(
+          status: 200,
+          data: const <String, dynamic>{
+            'success': true,
+            'puntos': <dynamic>[
+              [-1.6548, -78.6795],
+              ['lat_invalida', -78.6802],
+            ],
+            'distanciaMetros': 120,
+            'duracionSegundos': 90,
+          },
+        ),
+      );
+      await expectLater(
+        proveedorPuntosInvalidos.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('La ruta contiene coordenadas inválidas'),
+          ),
+        ),
+      );
+
+      // 6. Distancia o duración faltantes / inválidas
+      final proveedorSinDistancia = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async => FunctionResponse(
+          status: 200,
+          data: const <String, dynamic>{
+            'success': true,
+            'puntos': <List<double>>[
+              [-1.6548, -78.6795],
+              [-1.6555, -78.6802],
+            ],
+            'distanciaMetros': null,
+            'duracionSegundos': 120,
+          },
+        ),
+      );
+      await expectLater(
+        proveedorSinDistancia.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('OpenRouteService no devolvió la distancia o duración'),
+          ),
+        ),
+      );
+
+      // 7. Error de conexión (SocketException / TimeoutException) y FunctionException (401 / 502)
+      final proveedorSinRed = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async =>
+            throw const SocketException('Network unreachable'),
+      );
+      await expectLater(
+        proveedorSinRed.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('Error de conexión al calcular la ruta'),
+          ),
+        ),
+      );
+
+      final proveedorTimeout = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async => throw TimeoutException('Tiempo agotado'),
+      );
+      await expectLater(
+        proveedorTimeout.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            contains('Se agotó el tiempo de espera al calcular la ruta peatonal'),
+          ),
+        ),
+      );
+
+      final proveedorErrorEdgeFunction = ProveedorRutasSupabase(
+        tieneSesionActiva: () => true,
+        invocar: (_, _) async => throw const FunctionException(
+          status: 502,
+          details: <String, dynamic>{'error': 'No se pudo calcular la ruta'},
+        ),
+      );
+      await expectLater(
+        proveedorErrorEdgeFunction.calcular(
+          origen: origenValido,
+          destino: destinoValido,
+        ),
+        throwsA(
+          isA<ErrorRutas>().having(
+            (e) => e.mensaje,
+            'mensaje',
+            'No se pudo calcular la ruta',
+          ),
+        ),
+      );
+
+      expect(
+        ServicioRutas.mensajeError(
+          const FunctionException(status: 401, details: 'Unauthorized'),
+        ),
+        contains('Debes iniciar sesión activa'),
+      );
     },
   );
 }
