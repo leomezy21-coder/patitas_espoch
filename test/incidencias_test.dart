@@ -610,6 +610,21 @@ void main() {
       );
       expect(RolUsuario.administrador.puedeGestionarEstadoIncidencias, isTrue);
 
+      proveedorIncidencias.incidencias = <IncidenciaModelo>[
+        crearIncidenciaMuestra(
+          id: idIncidencia1,
+          estado: EstadoIncidencia.reportada,
+        ),
+        crearIncidenciaMuestra(
+          id: idIncidencia2,
+          estado: EstadoIncidencia.enAtencion,
+        ),
+        crearIncidenciaMuestra(
+          id: idIncidencia3,
+          estado: EstadoIncidencia.resuelta,
+        ),
+      ];
+
       for (final rol in RolUsuario.values) {
         await tester.pumpWidget(
           MaterialApp(
@@ -645,6 +660,10 @@ void main() {
               ? const ValueKey('tarjeta_admin_incidencias_activas')
               : const ValueKey('tarjeta_pa_incidencias_activas');
           final tarjetaActivas = find.byKey(llaveIncidenciasActivas);
+          expect(
+            find.descendant(of: tarjetaActivas, matching: find.text('2')),
+            findsOneWidget,
+          );
           await tester.ensureVisible(tarjetaActivas);
           await tester.pumpAndSettle();
           await tester.tap(tarjetaActivas);

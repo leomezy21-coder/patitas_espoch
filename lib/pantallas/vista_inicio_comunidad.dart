@@ -945,17 +945,18 @@ class _PanelInicioPersonalAutorizadoEstado
 ///   - "Fichas pendientes" -> `PantallaReportesAnimales(perfil: perfil, soloRegistrosPendientesRevision: true)`
 ///     ("Registros pendientes"), mostrando unicamente los registros basicos pendientes de
 ///     revision administrativa y respetando que el administrador no realiza validaciones clinicas.
+///   - "Incidencias activas" -> `PantallaGestionIncidencias(perfil: perfil, soloActivasInicial: true)`,
+///     mostrando el contador real de incidencias en estado `reportada` o `en_atencion`.
 ///   - "Reportar avistamiento" -> `PantallaRegistroAvistamiento`.
+///   - "Reportar incidencia" -> `PantallaRegistroIncidencia`.
 ///   - "Escanear QR" -> `PantallaEscanearQr`.
 ///   - "Ver mapa de animales" -> pestana del mapa del campus.
 ///   - "Agregar otro animalito" -> `PantallaRegistroAnimal` (datos basicos).
 /// - "Asignacion de roles" abre PantallaAsignacionRoles con autorizacion en servidor.
 /// - Deja deshabilitados como "Proximamente" y sin datos inventados:
-///   - "Incidencias activas"
 ///   - "Proximas vacunas"
 ///   - "Reevaluaciones"
-///   - "Reportar incidencia"
-class _PanelInicioAdministrador extends StatelessWidget {
+class _PanelInicioAdministrador extends StatefulWidget {
   final PerfilUsuarioModelo perfil;
   final VoidCallback alAbrirMapa;
   final VoidCallback alAbrirRegistroAvistamiento;
@@ -972,26 +973,78 @@ class _PanelInicioAdministrador extends StatelessWidget {
     required this.tarjetaAgregarAnimal,
   });
 
+  @override
+  State<_PanelInicioAdministrador> createState() =>
+      _PanelInicioAdministradorEstado();
+}
+
+class _PanelInicioAdministradorEstado
+    extends State<_PanelInicioAdministrador> {
+  int? _incidenciasActivas;
+  bool _cargandoIncidencias = false;
+  int _idConsultaIncidencias = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarIncidenciasActivas();
+    ServicioIncidencias.cambios.addListener(_alCambiarIncidencias);
+  }
+
+  @override
+  void dispose() {
+    ServicioIncidencias.cambios.removeListener(_alCambiarIncidencias);
+    super.dispose();
+  }
+
+  void _alCambiarIncidencias() {
+    _cargarIncidenciasActivas();
+  }
+
+  Future<void> _cargarIncidenciasActivas() async {
+    final consultaActual = ++_idConsultaIncidencias;
+    setState(() {
+      _cargandoIncidencias = true;
+    });
+    try {
+      final lista = await ServicioIncidencias.proveedor.listar();
+      if (!mounted || consultaActual != _idConsultaIncidencias) return;
+      setState(() {
+        _incidenciasActivas = lista.where((i) => i.estaActiva).length;
+        _cargandoIncidencias = false;
+      });
+    } catch (_) {
+      if (!mounted || consultaActual != _idConsultaIncidencias) return;
+      setState(() {
+        _incidenciasActivas = null;
+        _cargandoIncidencias = false;
+      });
+    }
+  }
+
   void _abrirRevisionAnimales(BuildContext context) {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => PantallaReportesAnimales(
-          perfil: perfil,
+          perfil: widget.perfil,
           soloRegistrosPendientesRevision: true,
         ),
       ),
     );
   }
 
-  void _abrirGestionIncidencias(BuildContext context) {
-    Navigator.of(context).push<void>(
+  Future<void> _abrirGestionIncidencias(BuildContext context) async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => PantallaGestionIncidencias(
-          perfil: perfil,
+          perfil: widget.perfil,
           soloActivasInicial: true,
         ),
       ),
     );
+    if (mounted) {
+      _cargarIncidenciasActivas();
+    }
   }
 
   @override
@@ -1098,7 +1151,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
           Semantics(
             label: 'Asignación de roles. Gestiona y asigna roles de usuario',
             button: true,
-            enabled: perfil.activo,
+            enabled: widget.perfil.activo,
             child: Material(
               color: const Color(0xFFFAF2E8),
               shape: RoundedRectangleBorder(
@@ -1108,12 +1161,12 @@ class _PanelInicioAdministrador extends StatelessWidget {
               child: InkWell(
                 key: const ValueKey('tarjeta_admin_asignacion_roles'),
                 borderRadius: BorderRadius.circular(18),
-                onTap: !perfil.activo
+                onTap: !widget.perfil.activo
                     ? null
                     : () => Navigator.of(context).push<void>(
                         MaterialPageRoute(
                           builder: (_) =>
-                              PantallaAsignacionRoles(perfil: perfil),
+                              PantallaAsignacionRoles(perfil: widget.perfil),
                         ),
                       ),
                 child: ConstrainedBox(
@@ -1231,6 +1284,8 @@ class _PanelInicioAdministrador extends StatelessWidget {
             icono: Icons.warning_amber_rounded,
             colorFondoIcono: const Color(0xFFBCE3F5),
             colorIcono: const Color(0xFF4E2509),
+            contadorReal: _incidenciasActivas,
+            cargando: _cargandoIncidencias,
             habilitada: true,
             permitirCrecimientoVertical: true,
             alPresionar: () => _abrirGestionIncidencias(context),
@@ -1309,7 +1364,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
                   colorIcono: const Color(0xFF0A6847),
                   colorTexto: const Color(0xFF094230),
                   permitirCrecimientoVertical: true,
-                  alPresionar: alAbrirRegistroAvistamiento,
+                  alPresionar: widget.alAbrirRegistroAvistamiento,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1324,7 +1379,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
                   colorIcono: TemaPatitas.colorNaranjaPrimario,
                   colorTexto: TemaPatitas.colorMarronOscuro,
                   permitirCrecimientoVertical: true,
-                  alPresionar: alAbrirRegistroIncidencia,
+                  alPresionar: widget.alAbrirRegistroIncidencia,
                 ),
               ),
             ],
@@ -1344,7 +1399,7 @@ class _PanelInicioAdministrador extends StatelessWidget {
                   colorIcono: const Color(0xFF6A1B9A),
                   colorTexto: const Color(0xFF2E1A47),
                   permitirCrecimientoVertical: true,
-                  alPresionar: alAbrirEscaneoQr,
+                  alPresionar: widget.alAbrirEscaneoQr,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1359,13 +1414,13 @@ class _PanelInicioAdministrador extends StatelessWidget {
                   colorIcono: const Color(0xFF0277BD),
                   colorTexto: const Color(0xFF0B3954),
                   permitirCrecimientoVertical: true,
-                  alPresionar: alAbrirMapa,
+                  alPresionar: widget.alAbrirMapa,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          tarjetaAgregarAnimal,
+          widget.tarjetaAgregarAnimal,
         ],
       ),
     );
