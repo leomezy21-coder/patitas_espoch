@@ -13,6 +13,7 @@ import 'pantalla_asignacion_roles.dart';
 import 'pantalla_escanear_qr.dart';
 import 'pantalla_ficha_animal.dart';
 import 'pantalla_gestion_incidencias.dart';
+import 'pantalla_proximas_vacunas.dart';
 import 'pantalla_registro_animal.dart';
 import 'pantalla_registro_avistamiento.dart';
 import 'pantalla_registro_incidencia.dart';
@@ -616,6 +617,10 @@ class _PanelInicioPersonalAutorizadoEstado
       .where(VistaCatalogoAnimales.esFichaPendientePersonalAutorizado)
       .toList();
 
+  /// Dosis pendientes de vacunación (hoy, próximas o atrasadas) asociadas a animales activos.
+  List<DosisVacunaPendiente> get _dosisVacunasPendientes =>
+      DosisVacunaPendiente.extraerDeAnimales(_animales);
+
   Future<void> _abrirListadoRevision() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -623,6 +628,17 @@ class _PanelInicioPersonalAutorizadoEstado
           perfil: widget.perfil,
           soloFichasPendientesSalud: true,
         ),
+      ),
+    );
+    if (mounted) {
+      _cargarAnimales();
+    }
+  }
+
+  Future<void> _abrirProximasVacunas() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PantallaProximasVacunas(perfil: widget.perfil),
       ),
     );
     if (mounted) {
@@ -695,15 +711,18 @@ class _PanelInicioPersonalAutorizadoEstado
           alPresionar: _abrirGestionIncidencias,
         ),
         const SizedBox(height: 12),
-        const _TarjetaResumenPersonalAutorizado(
-          key: ValueKey('tarjeta_pa_proximas_vacunas'),
+        _TarjetaResumenPersonalAutorizado(
+          key: const ValueKey('tarjeta_pa_proximas_vacunas'),
           titulo: 'Próximas vacunas',
           subtitulo: 'Vacunaciones por realizar',
           icono: Icons.vaccines_outlined,
-          colorFondoIcono: Color(0xFFCBEBCB),
-          colorIcono: Color(0xFF4E2509),
-          habilitada: false,
-          etiquetaDeshabilitada: 'Próximamente',
+          colorFondoIcono: const Color(0xFFCBEBCB),
+          colorIcono: const Color(0xFF4E2509),
+          contadorReal:
+              _consultaExitosa ? _dosisVacunasPendientes.length : null,
+          cargando: _cargando,
+          habilitada: true,
+          alPresionar: _abrirProximasVacunas,
         ),
         const SizedBox(height: 12),
         const _TarjetaResumenPersonalAutorizado(

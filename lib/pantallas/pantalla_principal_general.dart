@@ -10,6 +10,7 @@ import 'vista_mapa_campus.dart';
 import 'pantalla_reportes_animales.dart';
 import 'pantalla_asignacion_roles.dart';
 import 'pantalla_gestion_incidencias.dart';
+import 'pantalla_proximas_vacunas.dart';
 //notificacion push
 import '../servicios/servicio_notificaciones.dart';
 
@@ -1112,6 +1113,19 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
           ),
           icon: const Icon(Icons.fact_check_outlined),
           label: const Text('Evaluar fichas de animales'),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const ValueKey('boton_gestion_proximas_vacunas'),
+          style: estiloBotonSecundarioVerde(),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  PantallaProximasVacunas(perfil: _resultadoPerfil!.perfil!),
+            ),
+          ),
+          icon: const Icon(Icons.vaccines_outlined),
+          label: const Text('Próximas vacunas'),
         ),
         const SizedBox(height: 12),
         FilledButton.icon(

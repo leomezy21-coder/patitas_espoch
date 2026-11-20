@@ -258,3 +258,119 @@ class VacunacionAnimal {
         : '$nombre ($fecha)';
   }
 }
+
+/// Categorías de clasificación temporal de una dosis pendiente de vacunación (V02).
+enum EstadoProximaVacuna {
+  hoy('Hoy'),
+  proxima('Próxima'),
+  atrasada('Atrasada');
+
+  final String etiquetaVisible;
+  const EstadoProximaVacuna(this.etiquetaVisible);
+}
+
+/// Representa una dosis de vacuna pendiente de aplicación asociada a un animal comunitario (V02).
+/// Se construye tanto para vacunas aplicadas con próxima dosis programada como para
+/// vacunas programadas sin fecha de aplicación previa.
+class DosisVacunaPendiente {
+  final AnimalModelo animal;
+  final VacunacionAnimal vacunacion;
+  final DateTime fechaProgramada;
+  final EstadoProximaVacuna estado;
+
+  const DosisVacunaPendiente({
+    required this.animal,
+    required this.vacunacion,
+    required this.fechaProgramada,
+    required this.estado,
+  });
+
+  /// Texto de la fecha programada en formato `AAAA-MM-DD`, sin inventar horas.
+  String get fechaProgramadaTexto => vacunacion.proximaDosis?.trim() ?? '';
+
+  /// Convierte una cadena `AAAA-MM-DD` válida en una fecha de calendario pura (`DateTime(y, m, d)`).
+  /// Devuelve `null` si el texto es nulo, vacío, no tiene formato `AAAA-MM-DD` o la fecha no existe.
+  static DateTime? parsearFechaCalendario(String? valor) {
+    final limpio = valor?.trim();
+    if (limpio == null || limpio.isEmpty) return null;
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(limpio)) return null;
+    final partes = limpio.split('-');
+    final anio = int.tryParse(partes[0]);
+    final mes = int.tryParse(partes[1]);
+    final dia = int.tryParse(partes[2]);
+    if (anio == null || mes == null || dia == null) return null;
+    final fecha = DateTime(anio, mes, dia);
+    if (fecha.year != anio || fecha.month != mes || fecha.day != dia) {
+      return null;
+    }
+    return fecha;
+  }
+
+  /// Normaliza cualquier `DateTime` a una fecha de calendario pura sin horas (`DateTime(y, m, d)`).
+  static DateTime normalizarFechaCalendario(DateTime fecha) =>
+      DateTime(fecha.year, fecha.month, fecha.day);
+
+  /// Clasifica una fecha programada respecto a la fecha actual de calendario.
+  static EstadoProximaVacuna clasificarFecha({
+    required DateTime fechaProgramada,
+    required DateTime fechaActual,
+  }) {
+    final programada = normalizarFechaCalendario(fechaProgramada);
+    final hoy = normalizarFechaCalendario(fechaActual);
+    if (programada.isBefore(hoy)) {
+      return EstadoProximaVacuna.atrasada;
+    }
+    if (programada.isAfter(hoy)) {
+      return EstadoProximaVacuna.proxima;
+    }
+    return EstadoProximaVacuna.hoy;
+  }
+
+  /// Extrae y clasifica todas las dosis pendientes de vacunación de una lista de animales activos.
+  /// - Incluye vacunas aplicadas con `proximaDosis` válida y vacunas programadas con `proximaDosis` válida.
+  /// - Excluye vacunas sin `proximaDosis` o con fecha inválida.
+  /// - Excluye animales inactivos o rechazados administrativamente.
+  static List<DosisVacunaPendiente> extraerDeAnimales(
+    Iterable<AnimalModelo> animales, {
+    DateTime? fechaReferencia,
+  }) {
+    final hoy = normalizarFechaCalendario(fechaReferencia ?? DateTime.now());
+    final resultado = <DosisVacunaPendiente>[];
+
+    for (final animal in animales) {
+      if (!animal.activo || animal.revisionAdministrativa == 'rechazada') {
+        continue;
+      }
+      for (final vacuna in animal.historialVacunaciones) {
+        if (!vacuna.tieneProximaDosis) continue;
+        final fechaProgramada = parsearFechaCalendario(vacuna.proximaDosis);
+        if (fechaProgramada == null) continue;
+        final estado = clasificarFecha(
+          fechaProgramada: fechaProgramada,
+          fechaActual: hoy,
+        );
+        resultado.add(
+          DosisVacunaPendiente(
+            animal: animal,
+            vacunacion: vacuna,
+            fechaProgramada: fechaProgramada,
+            estado: estado,
+          ),
+        );
+      }
+    }
+
+    resultado.sort((a, b) {
+      final compFecha = a.fechaProgramada.compareTo(b.fechaProgramada);
+      if (compFecha != 0) return compFecha;
+      final compAnimal = a.animal.nombre.toLowerCase().compareTo(
+        b.animal.nombre.toLowerCase(),
+      );
+      if (compAnimal != 0) return compAnimal;
+      return a.vacunacion.id.compareTo(b.vacunacion.id);
+    });
+
+    return resultado;
+  }
+}
+

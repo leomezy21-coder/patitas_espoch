@@ -816,7 +816,7 @@ void main() {
       expect(find.text('Incidencias activas'), findsOneWidget);
       expect(find.text('Próximas vacunas'), findsOneWidget);
       expect(find.text('Reevaluaciones'), findsOneWidget);
-      expect(find.text('Próximamente'), findsNWidgets(2));
+      expect(find.text('Próximamente'), findsOneWidget);
       expect(find.text('Animales por completar'), findsOneWidget);
 
       await tester.ensureVisible(tarjetaAgregar);
