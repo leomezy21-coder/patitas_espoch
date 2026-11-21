@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../modelos/incidencia_modelo.dart';
 import 'configuracion_supabase.dart';
+import 'servicio_notificaciones.dart';
 
 class ErrorIncidencias implements Exception {
   final String mensaje;
@@ -133,6 +134,11 @@ class ProveedorIncidenciasSupabase implements ProveedorIncidencias {
           incidencia.estado != EstadoIncidencia.reportada) {
         throw const FormatException();
       }
+      await ServicioNotificaciones.notificarEventoIncidencia(
+        idIncidencia: incidencia.id,
+        evento: 'registro',
+        estadoClave: incidencia.estado.codigoBd,
+      );
       return incidencia;
     } catch (error) {
       throw ErrorIncidencias(ServicioIncidencias.mensajeError(error));
@@ -232,6 +238,11 @@ class ProveedorIncidenciasSupabase implements ProveedorIncidencias {
       if (incidencia.id != idLimpio || incidencia.estado != nuevoEstado) {
         throw const FormatException();
       }
+      await ServicioNotificaciones.notificarEventoIncidencia(
+        idIncidencia: incidencia.id,
+        evento: 'cambio_estado',
+        estadoClave: incidencia.estado.codigoBd,
+      );
       return incidencia;
     } catch (error) {
       throw ErrorIncidencias(ServicioIncidencias.mensajeError(error));

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../componentes/componentes_autenticacion_patitas.dart';
@@ -35,12 +37,74 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
   int _indicePestana = 0;
   bool _cerrandoSesion = false;
   bool _cargandoPerfil = true;
+  bool _moduloIncidenciasAbiertoPorNotificacion = false;
   ResultadoConsultaPerfil? _resultadoPerfil;
+
+  StreamSubscription<AvisoPushIncidencia>? _suscripcionPrimerPlano;
+  StreamSubscription<AvisoPushIncidencia>? _suscripcionApertura;
 
   @override
   void initState() {
     super.initState();
+    _suscripcionPrimerPlano = ServicioNotificaciones.avisosPrimerPlano.listen(
+      _alRecibirAvisoPrimerPlano,
+    );
+    _suscripcionApertura = ServicioNotificaciones.avisosAbiertos.listen(
+      _alTocarNotificacionPush,
+    );
     _cargarPerfilUsuario();
+  }
+
+  @override
+  void dispose() {
+    _suscripcionPrimerPlano?.cancel();
+    _suscripcionApertura?.cancel();
+    super.dispose();
+  }
+
+  void _alRecibirAvisoPrimerPlano(AvisoPushIncidencia aviso) {
+    final perfil = _resultadoPerfil?.perfil;
+    if (!mounted || perfil == null || !perfil.activo) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('snackbar_notificacion_fcm_primer_plano'),
+          duration: const Duration(seconds: 5),
+          content: Text('${aviso.titulo}: ${aviso.cuerpo}'),
+          action: SnackBarAction(
+            label: 'Ver',
+            textColor: TemaPatitas.colorDuraznoClaro,
+            onPressed: () => _abrirIncidenciasDesdeNotificacion(aviso),
+          ),
+        ),
+      );
+  }
+
+  void _alTocarNotificacionPush(AvisoPushIncidencia aviso) {
+    _abrirIncidenciasDesdeNotificacion(aviso);
+  }
+
+  Future<void> _abrirIncidenciasDesdeNotificacion(
+    AvisoPushIncidencia aviso,
+  ) async {
+    if (!mounted || _moduloIncidenciasAbiertoPorNotificacion) return;
+    final perfil = _resultadoPerfil?.perfil;
+    if (perfil == null || !perfil.activo || !ServicioAutenticacion.tieneSesionActiva) {
+      return;
+    }
+
+    _moduloIncidenciasAbiertoPorNotificacion = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => PantallaGestionIncidencias(perfil: perfil),
+        ),
+      );
+    } finally {
+      _moduloIncidenciasAbiertoPorNotificacion = false;
+    }
   }
 
   /// Obtiene el perfil y rol actual desde `ServicioAutenticacion`.
@@ -66,6 +130,11 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
         _indicePestana = 0;
       }
     });
+
+    final perfil = resultado.perfil;
+    if (perfil != null && perfil.activo) {
+      unawaited(ServicioNotificaciones.vincularDispositivoConPerfil(perfil));
+    }
   }
 
   /// Confirma y ejecuta el cierre de sesion institucional.

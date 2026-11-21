@@ -49,7 +49,23 @@ class _PantallaGestionIncidenciasEstado
     _filtroEstado = widget.filtroEstadoInicial;
     _soloActivas =
         widget.soloActivasInicial && widget.filtroEstadoInicial == null;
+    ServicioIncidencias.cambios.addListener(_alRecibirNotificacionCambio);
     if (_cuentaActiva) {
+      _cargarIncidencias();
+    }
+  }
+
+  @override
+  void dispose() {
+    ServicioIncidencias.cambios.removeListener(_alRecibirNotificacionCambio);
+    super.dispose();
+  }
+
+  void _alRecibirNotificacionCambio() {
+    if (mounted &&
+        _cuentaActiva &&
+        !_cargando &&
+        _idProcesandoCambio == null) {
       _cargarIncidencias();
     }
   }

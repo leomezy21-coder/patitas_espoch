@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../modelos/perfil_usuario_modelo.dart';
 import '../validaciones/politica_contrasena.dart';
 import 'configuracion_supabase.dart';
+import 'servicio_notificaciones.dart';
 
 /// Modelo de resultado para operaciones de autenticacion.
 class ResultadoAutenticacion {
@@ -166,9 +167,10 @@ class ServicioAutenticacion {
     return _proveedor.obtenerPerfilUsuarioActual();
   }
 
-  /// Cierra la sesion activa.
-  static Future<void> cerrarSesion() {
-    return _proveedor.cerrarSesion();
+  /// Cierra la sesion activa desvinculando previamente el dispositivo FCM.
+  static Future<void> cerrarSesion() async {
+    await ServicioNotificaciones.desvincularDispositivoAlCerrarSesion();
+    await _proveedor.cerrarSesion();
   }
 
   /// Traduce los mensajes de AuthException a explicaciones claras en espanol sin exponer tokens ni enlaces.
