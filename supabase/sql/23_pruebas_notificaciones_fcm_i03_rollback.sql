@@ -104,6 +104,14 @@ BEGIN
   PERFORM set_config('patitas_test_fcm.animal',   id_animal_test::text, true);
   PERFORM set_config('patitas_test_fcm.inc',      id_inc_test::text,    true);
 
+  -- Datos maestros minimos del entorno aislado. Todos los INSERT se revierten
+  -- con el ROLLBACK final; no ejecutar esta seccion en produccion.
+  INSERT INTO public.roles (id_rol, nombre) VALUES
+    (1, 'usuario_general'),
+    (2, 'personal_autorizado'),
+    (3, 'administrador')
+  ON CONFLICT (id_rol) DO NOTHING;
+
   INSERT INTO auth.users(id, email)
   VALUES
     (u_general,  u_general::text  || '@espoch.edu.ec'),
@@ -111,11 +119,22 @@ BEGIN
     (u_admin,    u_admin::text    || '@espoch.edu.ec'),
     (u_inactivo, u_inactivo::text || '@espoch.edu.ec');
 
+  -- El pg_dump --schema public,privado no incluye el trigger auth.users
+  -- encargado de crear perfiles. Esta insercion sirve en ambos entornos:
+  -- con trigger, ON CONFLICT evita duplicados; sin trigger, crea perfiles.
+  INSERT INTO public.perfiles_usuario (id_usuario, id_rol, activo) VALUES
+    (u_general, 1, true),
+    (u_personal, 2, true),
+    (u_admin, 3, true),
+    (u_inactivo, 1, false)
+  ON CONFLICT (id_usuario) DO NOTHING;
+
   UPDATE public.perfiles_usuario SET id_rol = 1, activo = true  WHERE id_usuario = u_general;
   UPDATE public.perfiles_usuario SET id_rol = 2, activo = true  WHERE id_usuario = u_personal;
   UPDATE public.perfiles_usuario SET id_rol = 3, activo = true  WHERE id_usuario = u_admin;
   UPDATE public.perfiles_usuario SET id_rol = 1, activo = false WHERE id_usuario = u_inactivo;
 
+  PERFORM set_config('request.jwt.claim.sub', u_personal::text, true);
   PERFORM public.registrar_animal_con_foto(
     u_personal,
     id_animal_test,
@@ -136,6 +155,7 @@ SET LOCAL ROLE authenticated;
 DO $$
 DECLARE
   v_reg jsonb;
+  v_id_inicial text;
   v_desv boolean;
 BEGIN
   v_reg := public.registrar_dispositivo_fcm('fid_instalacion_prueba_001', 'android');
@@ -143,14 +163,14 @@ BEGIN
     RAISE EXCEPTION 'No se vinculo el FID para usuario activo.';
   END IF;
 
-  -- Upsert idempotente del mismo FID
+  -- Comprobacion de idempotencia por id retornado: no depende de SELECT
+  -- directo sobre dispositivos_fcm, donde RLS puede ocultar filas.
+  v_id_inicial := v_reg->>'id_dispositivo';
   v_reg := public.registrar_dispositivo_fcm('fid_instalacion_prueba_001', 'android');
-  IF (
-    SELECT count(*)
-    FROM public.dispositivos_fcm d
-    WHERE d.token_fcm = 'fid_instalacion_prueba_001'
-  ) <> 1 THEN
-    RAISE EXCEPTION 'El upsert de registrar_dispositivo_fcm duplico la fila.';
+  IF v_id_inicial IS NULL
+     OR v_id_inicial = ''
+     OR v_id_inicial IS DISTINCT FROM v_reg->>'id_dispositivo' THEN
+    RAISE EXCEPTION 'El registro FCM no fue idempotente.';
   END IF;
 
   v_desv := public.desvincular_dispositivo_fcm('fid_instalacion_prueba_001');
