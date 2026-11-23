@@ -144,7 +144,9 @@ class ProveedorIncidenciasMemoria implements ProveedorIncidencias {
   @override
   Future<IncidenciaModelo> obtenerDetalle(String idIncidencia) async {
     consultasDetalle++;
-    final encontrada = incidencias.where((i) => i.id == idIncidencia).firstOrNull;
+    final encontrada = incidencias
+        .where((i) => i.id == idIncidencia)
+        .firstOrNull;
     if (encontrada == null) {
       throw const ErrorIncidencias('La incidencia solicitada no existe.');
     }
@@ -283,165 +285,165 @@ void main() {
     ServicioUbicacionCampus.restaurarProveedor();
   });
 
-  test(
-    'Modelo y servicio validan estado inicial reportada, transiciones RF-16, historial y ausencia de sesión',
-    () async {
-      final solicitud = SolicitudRegistroIncidencia(
-        idIncidencia: '44444444-4444-4444-8444-444444444444',
-        idAnimal: idAnimalPrueba,
-        tipo: TipoIncidencia.fueraZona,
-        descripcion: 'Se observó cerca de la salida principal de la politécnica.',
-        latitud: -1.6548,
-        longitud: -78.6795,
-      );
+  test('Modelo y servicio validan estado inicial reportada, transiciones RF-16, historial y ausencia de sesión', () async {
+    final solicitud = SolicitudRegistroIncidencia(
+      idIncidencia: '44444444-4444-4444-8444-444444444444',
+      idAnimal: idAnimalPrueba,
+      tipo: TipoIncidencia.fueraZona,
+      descripcion: 'Se observó cerca de la salida principal de la politécnica.',
+      latitud: -1.6548,
+      longitud: -78.6795,
+    );
 
-      // Los códigos de tipo en Flutter coinciden exactamente con el CHECK de SQL.
-      expect(
-        TipoIncidencia.values.map((t) => t.codigoBd).toList(),
-        equals(<String>['herido', 'desorientado', 'fuera_zona', 'atencion']),
-      );
+    // Los códigos de tipo en Flutter coinciden exactamente con el CHECK de SQL.
+    expect(
+      TipoIncidencia.values.map((t) => t.codigoBd).toList(),
+      equals(<String>[
+        'herido',
+        'desorientado',
+        'fuera_zona',
+        'atencion',
+        'comportamiento',
+      ]),
+    );
 
-      // Los estados de incidencia y el flujo RF-16 son exactamente reportada -> en_atencion -> resuelta.
-      expect(
-        EstadoIncidencia.values.map((e) => e.codigoBd).toList(),
-        equals(<String>['reportada', 'en_atencion', 'resuelta']),
-      );
-      expect(
-        EstadoIncidencia.reportada.siguienteEstado,
-        EstadoIncidencia.enAtencion,
-      );
-      expect(
-        EstadoIncidencia.enAtencion.siguienteEstado,
-        EstadoIncidencia.resuelta,
-      );
-      expect(EstadoIncidencia.resuelta.siguienteEstado, isNull);
+    // Los estados de incidencia y el flujo RF-16 son exactamente reportada -> en_atencion -> resuelta.
+    expect(
+      EstadoIncidencia.values.map((e) => e.codigoBd).toList(),
+      equals(<String>['reportada', 'en_atencion', 'resuelta']),
+    );
+    expect(
+      EstadoIncidencia.reportada.siguienteEstado,
+      EstadoIncidencia.enAtencion,
+    );
+    expect(
+      EstadoIncidencia.enAtencion.siguienteEstado,
+      EstadoIncidencia.resuelta,
+    );
+    expect(EstadoIncidencia.resuelta.siguienteEstado, isNull);
 
-      // La firma de parámetros coincide exactamente con public.registrar_incidencia.
-      expect(
-        solicitud.parametrosRpc.keys.toSet(),
-        equals(<String>{
-          'p_id_incidencia',
-          'p_id_animal',
-          'p_tipo',
-          'p_descripcion',
-          'p_latitud',
-          'p_longitud',
-          'p_id_avistamiento',
-        }),
-      );
+    // La firma de parámetros coincide exactamente con public.registrar_incidencia.
+    expect(
+      solicitud.parametrosRpc.keys.toSet(),
+      equals(<String>{
+        'p_id_incidencia',
+        'p_id_animal',
+        'p_tipo',
+        'p_descripcion',
+        'p_latitud',
+        'p_longitud',
+        'p_id_avistamiento',
+      }),
+    );
 
-      // La solicitud nunca envía autor, estado ni responsable desde el cliente.
-      expect(
-        solicitud.parametrosRpc.containsKey('id_usuario_reporta'),
-        isFalse,
-      );
-      expect(solicitud.parametrosRpc.containsKey('estado'), isFalse);
-      expect(
-        solicitud.parametrosRpc.containsKey('id_usuario_responsable'),
-        isFalse,
-      );
+    // La solicitud nunca envía autor, estado ni responsable desde el cliente.
+    expect(solicitud.parametrosRpc.containsKey('id_usuario_reporta'), isFalse);
+    expect(solicitud.parametrosRpc.containsKey('estado'), isFalse);
+    expect(
+      solicitud.parametrosRpc.containsKey('id_usuario_responsable'),
+      isFalse,
+    );
 
-      // Sin instancia/sesión activa de Supabase, el proveedor real rechaza registro, listado y cambio de estado.
-      final proveedorSinSesion = ProveedorIncidenciasSupabase();
-      for (final accion in <Future<Object?> Function()>[
-        () => proveedorSinSesion.registrar(solicitud),
-        () => proveedorSinSesion.listar(),
-        () => proveedorSinSesion.obtenerDetalle(idIncidencia1),
-        () => proveedorSinSesion.actualizarEstado(
-          idIncidencia: idIncidencia1,
-          estadoActual: EstadoIncidencia.reportada,
-          nuevoEstado: EstadoIncidencia.enAtencion,
-        ),
-      ]) {
-        await expectLater(
-          accion(),
-          throwsA(
-            isA<ErrorIncidencias>().having(
-              (e) => e.mensaje,
-              'mensaje',
-              contains('no está conectado al servidor'),
-            ),
-          ),
-        );
-      }
-
-      // Rechaza transiciones inválidas antes de invocar RPC (reportada -> resuelta, resuelta -> en_atencion).
-      var llamadasRpc = 0;
-      final proveedorTransiciones = ProveedorIncidenciasSupabase(
-        invocar: (_, _) async {
-          llamadasRpc++;
-          return <String, dynamic>{};
-        },
-      );
+    // Sin instancia/sesión activa de Supabase, el proveedor real rechaza registro, listado y cambio de estado.
+    final proveedorSinSesion = ProveedorIncidenciasSupabase();
+    for (final accion in <Future<Object?> Function()>[
+      () => proveedorSinSesion.registrar(solicitud),
+      () => proveedorSinSesion.listar(),
+      () => proveedorSinSesion.obtenerDetalle(idIncidencia1),
+      () => proveedorSinSesion.actualizarEstado(
+        idIncidencia: idIncidencia1,
+        estadoActual: EstadoIncidencia.reportada,
+        nuevoEstado: EstadoIncidencia.enAtencion,
+      ),
+    ]) {
       await expectLater(
-        proveedorTransiciones.actualizarEstado(
-          idIncidencia: idIncidencia1,
-          estadoActual: EstadoIncidencia.reportada,
-          nuevoEstado: EstadoIncidencia.resuelta,
-        ),
+        accion(),
         throwsA(
           isA<ErrorIncidencias>().having(
             (e) => e.mensaje,
             'mensaje',
-            contains('Transición de estado no permitida'),
+            contains('no está conectado al servidor'),
           ),
         ),
       );
-      await expectLater(
-        proveedorTransiciones.actualizarEstado(
-          idIncidencia: idIncidencia1,
-          estadoActual: EstadoIncidencia.resuelta,
-          nuevoEstado: EstadoIncidencia.enAtencion,
-        ),
-        throwsA(isA<ErrorIncidencias>()),
-      );
-      expect(llamadasRpc, 0);
+    }
 
-      // Si el servidor devolviera un estado inicial distinto de 'reportada', se rechaza.
-      final proveedorEstadoAlterado = ProveedorIncidenciasSupabase(
-        invocar: (nombre, parametros) async {
-          expect(nombre, 'registrar_incidencia');
-          return <String, dynamic>{
-            'id_incidencia': solicitud.idIncidencia,
-            'id_animal': solicitud.idAnimal,
-            'nombre_animal': 'Canela',
-            'tipo': 'fuera_zona',
-            'descripcion': solicitud.descripcion,
-            'estado': 'resuelta',
-            'fecha_registro': '2026-11-17T15:00:00Z',
-          };
-        },
-      );
-      await expectLater(
-        proveedorEstadoAlterado.registrar(solicitud),
-        throwsA(isA<ErrorIncidencias>()),
-      );
+    // Rechaza transiciones inválidas antes de invocar RPC (reportada -> resuelta, resuelta -> en_atencion).
+    var llamadasRpc = 0;
+    final proveedorTransiciones = ProveedorIncidenciasSupabase(
+      invocar: (_, _) async {
+        llamadasRpc++;
+        return <String, dynamic>{};
+      },
+    );
+    await expectLater(
+      proveedorTransiciones.actualizarEstado(
+        idIncidencia: idIncidencia1,
+        estadoActual: EstadoIncidencia.reportada,
+        nuevoEstado: EstadoIncidencia.resuelta,
+      ),
+      throwsA(
+        isA<ErrorIncidencias>().having(
+          (e) => e.mensaje,
+          'mensaje',
+          contains('Transición de estado no permitida'),
+        ),
+      ),
+    );
+    await expectLater(
+      proveedorTransiciones.actualizarEstado(
+        idIncidencia: idIncidencia1,
+        estadoActual: EstadoIncidencia.resuelta,
+        nuevoEstado: EstadoIncidencia.enAtencion,
+      ),
+      throwsA(isA<ErrorIncidencias>()),
+    );
+    expect(llamadasRpc, 0);
 
-      // Errores de autorización (42501) y concurrencia (40001) se traducen claramente.
-      final proveedorSinPermiso = ProveedorIncidenciasSupabase(
-        invocar: (_, _) async => throw const PostgrestException(
-          message: 'detalle interno',
-          code: '42501',
+    // Si el servidor devolviera un estado inicial distinto de 'reportada', se rechaza.
+    final proveedorEstadoAlterado = ProveedorIncidenciasSupabase(
+      invocar: (nombre, parametros) async {
+        expect(nombre, 'registrar_incidencia');
+        return <String, dynamic>{
+          'id_incidencia': solicitud.idIncidencia,
+          'id_animal': solicitud.idAnimal,
+          'nombre_animal': 'Canela',
+          'tipo': 'fuera_zona',
+          'descripcion': solicitud.descripcion,
+          'estado': 'resuelta',
+          'fecha_registro': '2026-11-17T15:00:00Z',
+        };
+      },
+    );
+    await expectLater(
+      proveedorEstadoAlterado.registrar(solicitud),
+      throwsA(isA<ErrorIncidencias>()),
+    );
+
+    // Errores de autorización (42501) y concurrencia (40001) se traducen claramente.
+    final proveedorSinPermiso = ProveedorIncidenciasSupabase(
+      invocar: (_, _) async => throw const PostgrestException(
+        message: 'detalle interno',
+        code: '42501',
+      ),
+    );
+    await expectLater(
+      proveedorSinPermiso.registrar(solicitud),
+      throwsA(
+        isA<ErrorIncidencias>().having(
+          (e) => e.mensaje,
+          'mensaje',
+          contains('sesión activa con permisos'),
         ),
-      );
-      await expectLater(
-        proveedorSinPermiso.registrar(solicitud),
-        throwsA(
-          isA<ErrorIncidencias>().having(
-            (e) => e.mensaje,
-            'mensaje',
-            contains('sesión activa con permisos'),
-          ),
-        ),
-      );
-      expect(
-        ServicioIncidencias.mensajeError(
-          const PostgrestException(message: 'concurrencia', code: '40001'),
-        ),
-        contains('cambió recientemente'),
-      );
-    },
-  );
+      ),
+    );
+    expect(
+      ServicioIncidencias.mensajeError(
+        const PostgrestException(message: 'concurrencia', code: '40001'),
+      ),
+      contains('cambió recientemente'),
+    );
+  });
 
   testWidgets(
     'Rechaza formularios incompletos o descripción corta y no solicita ubicación automáticamente',
@@ -518,8 +520,7 @@ void main() {
       await completarFormularioIncidencia(
         tester,
         tipo: TipoIncidencia.herido,
-        descripcion:
-            'Presenta cojera en la pata derecha junto a las canchas.',
+        descripcion: 'Presenta cojera en la pata derecha junto a las canchas.',
         adjuntarUbicacion: true,
       );
       expect(proveedorUbicacion.llamadasObtenerPosicion, 1);
@@ -799,10 +800,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Confirmar cambio de estado'), findsOneWidget);
-      expect(
-        find.text('Transición: Reportada → En atención'),
-        findsOneWidget,
-      );
+      expect(find.text('Transición: Reportada → En atención'), findsOneWidget);
 
       await tester.tap(
         find.byKey(const Key('incidencia_confirmar_cambio_estado')),
@@ -810,10 +808,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(proveedorIncidencias.cambiosEstado, 1);
-      expect(
-        find.text('Estado actualizado a En atención.'),
-        findsOneWidget,
-      );
+      expect(find.text('Estado actualizado a En atención.'), findsOneWidget);
       expect(find.text('Marcar como resuelta'), findsOneWidget);
 
       // 3. Simular fallo de concurrencia al intentar avanzar a Resuelta
@@ -823,19 +818,13 @@ void main() {
       await tester.tap(botonCambiar);
       await tester.pumpAndSettle();
       expect(find.text('Confirmar cambio de estado'), findsOneWidget);
-      expect(
-        find.text('Transición: En atención → Resuelta'),
-        findsOneWidget,
-      );
+      expect(find.text('Transición: En atención → Resuelta'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('incidencia_confirmar_cambio_estado')),
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('cambió recientemente'),
-        findsWidgets,
-      );
+      expect(find.textContaining('cambió recientemente'), findsWidgets);
       // El intento fallido no aplica el cambio de estado ni incrementa cambios efectivos
       expect(proveedorIncidencias.cambiosEstado, 1);
       // Permanece en 'En atención'
@@ -848,10 +837,7 @@ void main() {
       await tester.tap(botonCambiar);
       await tester.pumpAndSettle();
       expect(find.text('Confirmar cambio de estado'), findsOneWidget);
-      expect(
-        find.text('Transición: En atención → Resuelta'),
-        findsOneWidget,
-      );
+      expect(find.text('Transición: En atención → Resuelta'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('incidencia_confirmar_cambio_estado')),
       );

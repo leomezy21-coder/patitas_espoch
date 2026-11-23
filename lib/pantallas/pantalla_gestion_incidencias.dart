@@ -62,10 +62,7 @@ class _PantallaGestionIncidenciasEstado
   }
 
   void _alRecibirNotificacionCambio() {
-    if (mounted &&
-        _cuentaActiva &&
-        !_cargando &&
-        _idProcesandoCambio == null) {
+    if (mounted && _cuentaActiva && !_cargando && _idProcesandoCambio == null) {
       _cargarIncidencias();
     }
   }
@@ -222,9 +219,8 @@ class _PantallaGestionIncidenciasEstado
         _idProcesandoCambio = null;
         _error = mensaje;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(mensaje)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(mensaje)));
       return null;
     }
   }
@@ -248,7 +244,9 @@ class _PantallaGestionIncidenciasEstado
           if (!mounted) return;
           setState(() {
             _incidencias = _incidencias
-                .map((item) => item.id == detalleFresco.id ? detalleFresco : item)
+                .map(
+                  (item) => item.id == detalleFresco.id ? detalleFresco : item,
+                )
                 .toList();
           });
         },
@@ -480,7 +478,8 @@ class _PantallaGestionIncidenciasEstado
         ChoiceChip(
           key: const Key('filtro_incidencia_reportada'),
           label: const Text('Reportada'),
-          selected: !_soloActivas && _filtroEstado == EstadoIncidencia.reportada,
+          selected:
+              !_soloActivas && _filtroEstado == EstadoIncidencia.reportada,
           onSelected: (_) {
             setState(() {
               _soloActivas = false;
@@ -977,8 +976,7 @@ class _HojaDetalleIncidenciaEstado extends State<_HojaDetalleIncidencia> {
                 'Responsable de atención:',
                 _incidencia.responsableVisible!,
               ),
-            if (_incidencia.zona != null &&
-                _incidencia.zona!.trim().isNotEmpty)
+            if (_incidencia.zona != null && _incidencia.zona!.trim().isNotEmpty)
               _filaDetalle('Zona:', _incidencia.zona!),
             if (_incidencia.coordenadasVisibles != null)
               _filaDetalle(
@@ -1080,8 +1078,9 @@ class _HojaDetalleIncidenciaEstado extends State<_HojaDetalleIncidencia> {
                   FilledButton.icon(
                     key: Key('detalle_cambiar_estado_${_incidencia.id}'),
                     style: _estiloBotonAccionIncidencia(),
-                    onPressed:
-                        _cambiandoEstado ? null : _avanzarEstadoDesdeDetalle,
+                    onPressed: _cambiandoEstado
+                        ? null
+                        : _avanzarEstadoDesdeDetalle,
                     icon: const Icon(Icons.sync_alt_rounded, size: 18),
                     label: Text(accionSiguiente),
                   ),

@@ -25,12 +25,15 @@ import 'vista_mapa_campus.dart';
 class PantallaFichaAnimal extends StatefulWidget {
   final AnimalModelo animal;
   final PerfilUsuarioModelo? perfil;
+  // Contexto de solicitud activa; nulo para evaluaciones normales.
+  final String? idReevaluacion;
   final bool recargarAlIniciar;
   final TileProvider? proveedorTeselasMapa;
   const PantallaFichaAnimal({
     super.key,
     required this.animal,
     this.perfil,
+    this.idReevaluacion,
     this.recargarAlIniciar = true,
     this.proveedorTeselasMapa,
   });
@@ -197,7 +200,13 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
   Future<void> _evaluar(TipoEvaluacionAnimal tipo) async {
     final actualizado = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => PantallaEvaluarAnimal(animal: animal, tipo: tipo),
+        builder: (_) => PantallaEvaluarAnimal(
+          animal: animal,
+          tipo: tipo,
+          idReevaluacion: tipo == TipoEvaluacionAnimal.comportamiento
+              ? widget.idReevaluacion
+              : null,
+        ),
       ),
     );
     if (actualizado == true && mounted) {
@@ -496,7 +505,8 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
   Widget _construirAccionesSuperioresFicha() {
     final perfilActual = widget.perfil!;
     final accionesRol = <Widget>[
-      if (perfilActual.rol == RolUsuario.administrador && !animal.esDemostracion)
+      if (perfilActual.rol == RolUsuario.administrador &&
+          !animal.esDemostracion)
         _construirBotonAccionSecundaria(
           etiqueta: 'Asignar zona habitual',
           subtitulo: 'Definir el sector de referencia del animal en el campus',
@@ -938,7 +948,9 @@ class _EstadoFichaAnimal extends State<PantallaFichaAnimal> {
         'Último registro: ${textoAnimalVisible(animal.ultimoAvistamiento)}',
       );
       if (animal.zonaHabitual.trim().isNotEmpty) {
-        detalles.add('Zona habitual: ${textoAnimalVisible(animal.zonaHabitual)}');
+        detalles.add(
+          'Zona habitual: ${textoAnimalVisible(animal.zonaHabitual)}',
+        );
       }
     } else {
       detalles.add(

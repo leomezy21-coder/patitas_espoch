@@ -13,13 +13,21 @@ enum TipoIncidencia {
   fueraZona(
     codigoBd: 'fuera_zona',
     etiquetaVisible: 'Fuera de su zona habitual',
-    descripcionBreve: 'Observado lejos de su sector habitual o cerca de salidas.',
+    descripcionBreve:
+        'Observado lejos de su sector habitual o cerca de salidas.',
   ),
+
   atencion(
     codigoBd: 'atencion',
     etiquetaVisible: 'Situación de atención o cuidado',
     descripcionBreve:
         'Otra situación de salud o bienestar que requiere revisión.',
+  ),
+
+  comportamiento(
+    codigoBd: 'comportamiento',
+    etiquetaVisible: 'Comportamiento',
+    descripcionBreve: 'Conductas agresivas, cambios de comportamiento o situaciones que requieren reevaluación.',
   );
 
   final String codigoBd;
@@ -44,18 +52,9 @@ enum TipoIncidencia {
 
 /// Estados oficiales del ciclo de atención de una incidencia (RF-16).
 enum EstadoIncidencia {
-  reportada(
-    codigoBd: 'reportada',
-    etiquetaVisible: 'Reportada',
-  ),
-  enAtencion(
-    codigoBd: 'en_atencion',
-    etiquetaVisible: 'En atención',
-  ),
-  resuelta(
-    codigoBd: 'resuelta',
-    etiquetaVisible: 'Resuelta',
-  );
+  reportada(codigoBd: 'reportada', etiquetaVisible: 'Reportada'),
+  enAtencion(codigoBd: 'en_atencion', etiquetaVisible: 'En atención'),
+  resuelta(codigoBd: 'resuelta', etiquetaVisible: 'Resuelta');
 
   final String codigoBd;
   final String etiquetaVisible;
@@ -291,8 +290,9 @@ class IncidenciaModelo {
 
   String get fechaRegistroVisible => _formatearFechaHora(fechaRegistro);
 
-  String? get fechaActualizacionVisible =>
-      fechaActualizacion != null ? _formatearFechaHora(fechaActualizacion!) : null;
+  String? get fechaActualizacionVisible => fechaActualizacion != null
+      ? _formatearFechaHora(fechaActualizacion!)
+      : null;
 
   String? get fechaResolucionVisible =>
       fechaResolucion != null ? _formatearFechaHora(fechaResolucion!) : null;
@@ -323,7 +323,9 @@ class IncidenciaModelo {
         estado == null ||
         descripcion.isEmpty ||
         fechaRegistro == null) {
-      throw const FormatException('Incidencia con datos incompletos o inválidos.');
+      throw const FormatException(
+        'Incidencia con datos incompletos o inválidos.',
+      );
     }
 
     final valorLat = datos['latitud'];
@@ -344,7 +346,9 @@ class IncidenciaModelo {
           longitud < -180.0 ||
           longitud > 180.0 ||
           (latitud == 0.0 && longitud == 0.0)) {
-        throw const FormatException('Coordenadas de incidencia fuera de rango.');
+        throw const FormatException(
+          'Coordenadas de incidencia fuera de rango.',
+        );
       }
     }
 

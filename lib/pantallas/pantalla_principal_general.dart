@@ -91,7 +91,9 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
   ) async {
     if (!mounted || _moduloIncidenciasAbiertoPorNotificacion) return;
     final perfil = _resultadoPerfil?.perfil;
-    if (perfil == null || !perfil.activo || !ServicioAutenticacion.tieneSesionActiva) {
+    if (perfil == null ||
+        !perfil.activo ||
+        !ServicioAutenticacion.tieneSesionActiva) {
       return;
     }
 

@@ -14,11 +14,14 @@ import 'pantalla_escanear_qr.dart';
 import 'pantalla_ficha_animal.dart';
 import 'pantalla_gestion_incidencias.dart';
 import 'pantalla_proximas_vacunas.dart';
+import 'pantalla_reevaluaciones_comportamiento.dart';
 import 'pantalla_registro_animal.dart';
 import 'pantalla_registro_avistamiento.dart';
 import 'pantalla_registro_incidencia.dart';
 import 'pantalla_reportes_animales.dart';
 import 'vista_catalogo_animales.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Vista principal de inicio posterior a la autenticacion.
 /// - Para `usuario_general`, conserva el inicio comunitario existente.
@@ -532,6 +535,9 @@ class _PanelInicioPersonalAutorizado extends StatefulWidget {
 
 class _PanelInicioPersonalAutorizadoEstado
     extends State<_PanelInicioPersonalAutorizado> {
+  int? _reevaluacionesAbiertas;
+  bool _cargandoReevaluaciones = false;
+  int _idConsultaReevaluaciones = 0;
   List<AnimalModelo> _animales = const [];
   bool _cargando = false;
   bool _consultaExitosa = false;
@@ -545,8 +551,11 @@ class _PanelInicioPersonalAutorizadoEstado
   @override
   void initState() {
     super.initState();
+
     _cargarAnimales();
     _cargarIncidenciasActivas();
+    _cargarContadorReevaluaciones();
+
     ServicioAnimales.cambios.addListener(_alCambiarAnimales);
     ServicioIncidencias.cambios.addListener(_alCambiarIncidencias);
   }
@@ -562,8 +571,42 @@ class _PanelInicioPersonalAutorizadoEstado
     _cargarAnimales();
   }
 
+  Future<void> _cargarContadorReevaluaciones() async {
+    final consultaActual = ++_idConsultaReevaluaciones;
+
+    setState(() {
+      _cargandoReevaluaciones = true;
+    });
+
+    try {
+      final registros = await Supabase.instance.client
+          .from('reevaluaciones_comportamiento')
+          .select('id_reevaluacion')
+          .inFilter('estado', ['pendiente', 'en_revision']);
+
+      if (!mounted || consultaActual != _idConsultaReevaluaciones) {
+        return;
+      }
+
+      setState(() {
+        _reevaluacionesAbiertas = registros.length;
+        _cargandoReevaluaciones = false;
+      });
+    } catch (error) {
+      if (!mounted || consultaActual != _idConsultaReevaluaciones) {
+        return;
+      }
+
+      setState(() {
+        _reevaluacionesAbiertas = null;
+        _cargandoReevaluaciones = false;
+      });
+    }
+  }
+
   void _alCambiarIncidencias() {
     _cargarIncidenciasActivas();
+    _cargarContadorReevaluaciones();
   }
 
   Future<void> _cargarIncidenciasActivas() async {
@@ -646,6 +689,73 @@ class _PanelInicioPersonalAutorizadoEstado
     }
   }
 
+  Future<List<ResumenReevaluacion>> _cargarReevaluacionesReales() async {
+    final registros = await Supabase.instance.client
+        .from('reevaluaciones_comportamiento')
+        .select(
+          'id_reevaluacion, id_animal, estado, '
+          'fecha_registro, observaciones',
+        )
+        .order('fecha_registro', ascending: false);
+
+    if (registros.isEmpty) {
+      return [];
+    }
+
+    final animales = await ServicioAnimales.proveedor.listar();
+
+    final animalesPorId = {for (final animal in animales) animal.id: animal};
+
+    return registros.map((registro) {
+      final idAnimal = registro['id_animal'].toString();
+      final animal = animalesPorId[idAnimal];
+
+      final estado = switch (registro['estado']) {
+        'pendiente' => EstadoReevaluacion.pendiente,
+        'en_revision' => EstadoReevaluacion.enRevision,
+        'resuelto' => EstadoReevaluacion.resuelto,
+        _ => throw const FormatException('Estado de reevaluación desconocido.'),
+      };
+
+      final fecha = DateTime.parse(registro['fecha_registro'].toString());
+
+      final observacion = registro['observaciones']?.toString().trim() ?? '';
+
+      return ResumenReevaluacion(
+        id: registro['id_reevaluacion'].toString(),
+        idAnimal: idAnimal,
+        nombreAnimal: animal?.nombre ?? 'Animal comunitario',
+        especie: animal?.especie ?? 'Otros',
+        zona: (animal?.zonaHabitual.trim().isNotEmpty ?? false)
+            ? animal!.zonaHabitual
+            : 'Sin sector registrado',
+        fecha: fecha,
+        estado: estado,
+        motivo: observacion.isNotEmpty
+            ? observacion
+            : 'Solicitud originada por una incidencia de comportamiento.',
+        urlFotografia: animal?.urlFotografia,
+      );
+    }).toList();
+  }
+
+  Future<void> _abrirReevaluaciones() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PantallaReevaluacionesComportamiento(
+          perfil: widget.perfil,
+          modoDemostracion: false,
+          cargarReevaluaciones: _cargarReevaluacionesReales,
+        ),
+      ),
+    );
+
+    // Actualizar el contador al regresar a Inicio.
+    if (mounted) {
+      _cargarContadorReevaluaciones();
+    }
+  }
+
   Future<void> _abrirGestionIncidencias() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -718,22 +828,25 @@ class _PanelInicioPersonalAutorizadoEstado
           icono: Icons.vaccines_outlined,
           colorFondoIcono: const Color(0xFFCBEBCB),
           colorIcono: const Color(0xFF4E2509),
-          contadorReal:
-              _consultaExitosa ? _dosisVacunasPendientes.length : null,
+          contadorReal: _consultaExitosa
+              ? _dosisVacunasPendientes.length
+              : null,
           cargando: _cargando,
           habilitada: true,
           alPresionar: _abrirProximasVacunas,
         ),
         const SizedBox(height: 12),
-        const _TarjetaResumenPersonalAutorizado(
-          key: ValueKey('tarjeta_pa_reevaluaciones'),
+        _TarjetaResumenPersonalAutorizado(
+          contadorReal: _reevaluacionesAbiertas,
+          cargando: _cargandoReevaluaciones,
+          key: const ValueKey('tarjeta_pa_reevaluaciones'),
           titulo: 'Reevaluaciones',
           subtitulo: 'Comportamiento por revisar',
           icono: Icons.pets_rounded,
-          colorFondoIcono: Color(0xFFFAD0A2),
-          colorIcono: Color(0xFF4E2509),
-          habilitada: false,
-          etiquetaDeshabilitada: 'Próximamente',
+          colorFondoIcono: const Color(0xFFFAD0A2),
+          colorIcono: const Color(0xFF4E2509),
+          habilitada: true,
+          alPresionar: _abrirReevaluaciones,
         ),
         const SizedBox(height: 18),
 
@@ -978,8 +1091,7 @@ class _PanelInicioAdministrador extends StatefulWidget {
       _PanelInicioAdministradorEstado();
 }
 
-class _PanelInicioAdministradorEstado
-    extends State<_PanelInicioAdministrador> {
+class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
   int? _incidenciasActivas;
   bool _cargandoIncidencias = false;
   int _idConsultaIncidencias = 0;

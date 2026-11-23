@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../modelos/animal_modelo.dart';
 import '../servicios/servicio_animales.dart';
@@ -9,10 +10,13 @@ enum TipoEvaluacionAnimal { revision, vacunacion, comportamiento }
 class PantallaEvaluarAnimal extends StatefulWidget {
   final AnimalModelo animal;
   final TipoEvaluacionAnimal tipo;
+  // Solo para una reevaluación ya iniciada por personal autorizado.
+  final String? idReevaluacion;
   const PantallaEvaluarAnimal({
     super.key,
     required this.animal,
     required this.tipo,
+    this.idReevaluacion,
   });
   @override
   State<PantallaEvaluarAnimal> createState() => _EstadoEvaluarAnimal();
@@ -32,10 +36,14 @@ class _EstadoEvaluarAnimal extends State<PantallaEvaluarAnimal> {
   String? _error;
   bool get _esRevision => widget.tipo == TipoEvaluacionAnimal.revision;
   bool get _esVacunacion => widget.tipo == TipoEvaluacionAnimal.vacunacion;
+  bool get _esReevaluacion =>
+      widget.tipo == TipoEvaluacionAnimal.comportamiento &&
+      widget.idReevaluacion != null;
   bool get _esModalidadProgramada =>
       _modalidadVacuna == ModalidadVacunacion.programada;
 
   String get _textoBotonGuardar {
+    if (_esReevaluacion) return 'Guardar y resolver reevaluación';
     if (!_esVacunacion) return 'Guardar evaluación';
     if (_idVacunacion != null) return 'Guardar cambios y evaluación';
     if (_esModalidadProgramada) return 'Guardar programación y evaluación';
@@ -81,6 +89,8 @@ class _EstadoEvaluarAnimal extends State<PantallaEvaluarAnimal> {
         ? a.observacionVacunacion
         : a.comportamiento;
     _recomendaciones.text = a.recomendaciones;
+    // No decidir automáticamente 'favorable' al entrar a la reevaluación.
+    if (_esReevaluacion) _estado = 'pendiente';
   }
 
   @override
@@ -199,12 +209,27 @@ class _EstadoEvaluarAnimal extends State<PantallaEvaluarAnimal> {
           await servicio.revisar(widget.animal.id, _estado, _descripcion.text);
           break;
         case TipoEvaluacionAnimal.comportamiento:
-          await servicio.validarComportamiento(
-            widget.animal.id,
-            _estado,
-            _descripcion.text,
-            _recomendaciones.text,
-          );
+          if (_esReevaluacion) {
+            // Una sola RPC guarda el resultado y su historial y resuelve
+            // la solicitud en la misma transacción del servidor.
+            await Supabase.instance.client.rpc(
+              'registrar_reevaluacion_comportamiento',
+              params: {
+                'p_id_reevaluacion': widget.idReevaluacion,
+                'p_id_animal': widget.animal.id,
+                'p_estado': _estado,
+                'p_descripcion': _descripcion.text,
+                'p_recomendaciones': _recomendaciones.text,
+              },
+            );
+          } else {
+            await servicio.validarComportamiento(
+              widget.animal.id,
+              _estado,
+              _descripcion.text,
+              _recomendaciones.text,
+            );
+          }
           break;
         case TipoEvaluacionAnimal.vacunacion:
           final nombreVacuna = _vacuna.text.trim().isEmpty
@@ -250,6 +275,8 @@ class _EstadoEvaluarAnimal extends State<PantallaEvaluarAnimal> {
         ? 'Revisar registro básico'
         : _esVacunacion
         ? 'Vacunas de $nombreAnimal'
+        : _esReevaluacion
+        ? 'Reevaluar comportamiento'
         : 'Evaluar comportamiento';
     final opciones = _esRevision
         ? {'aprobada': 'Aprobar registro', 'rechazada': 'Rechazar registro'}
@@ -500,6 +527,9 @@ class _EstadoEvaluarAnimal extends State<PantallaEvaluarAnimal> {
                 )
                 .toList(),
             onChanged: _guardando ? null : (v) => setState(() => _estado = v!),
+            validator: (_) => _esReevaluacion && _estado == 'pendiente'
+                ? 'Elige favorable o requiere atención para resolver'
+                : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -1015,10 +1045,7 @@ class _EstadoEvaluarAnimal extends State<PantallaEvaluarAnimal> {
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text(
                   'Editar',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 ),
               ),
             ),

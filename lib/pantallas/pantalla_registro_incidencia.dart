@@ -111,8 +111,7 @@ class _EstadoRegistroIncidencia extends State<PantallaRegistroIncidencia> {
     if (_ocupado || _cargando) return;
     if (!widget.perfil.activo) {
       setState(() {
-        _error =
-            'Tu cuenta institucional debe estar activa para reportar una incidencia.';
+        _error = 'Tu cuenta institucional debe estar activa para reportar una incidencia.';
       });
       return;
     }
@@ -122,8 +121,7 @@ class _EstadoRegistroIncidencia extends State<PantallaRegistroIncidencia> {
 
     if (_idAnimal == null || _tipo == null || textoDescripcion.isEmpty) {
       setState(() {
-        _error =
-            'Selecciona el animal, el tipo de incidencia y escribe una descripción.';
+        _error = 'Selecciona el animal, el tipo de incidencia y escribe una descripción.';
       });
       return;
     }
@@ -327,8 +325,7 @@ class _EstadoRegistroIncidencia extends State<PantallaRegistroIncidencia> {
                     maxLength: 2000,
                     decoration: const InputDecoration(
                       labelText: 'Descripción de la incidencia',
-                      hintText:
-                          'Indica qué observaste, el estado del animal y referencias del lugar.',
+                      hintText: 'Indica qué observaste, el estado del animal y referencias del lugar.',
                     ),
                   ),
                   const SizedBox(height: 12),

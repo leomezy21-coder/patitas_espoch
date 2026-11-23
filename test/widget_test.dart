@@ -20,6 +20,8 @@ import 'package:patitas_espoch/pantallas/pantalla_registro_animal.dart';
 
 import 'soporte/proveedor_animales_memoria.dart';
 
+import 'package:patitas_espoch/pantallas/pantalla_reevaluaciones_comportamiento.dart';
+
 /// Doble de prueba para simular notificaciones en memoria durante las pruebas de widgets.
 class ProveedorNotificacionesSimulado extends ProveedorNotificaciones {
   final List<Map<String, dynamic>> _notificaciones;
@@ -787,7 +789,10 @@ void main() {
       expect(find.text('¡Hola, Ana!'), findsOneWidget);
       expect(find.text('Bienvenido a Patitas ESPOCH'), findsOneWidget);
       expect(find.text('Últimos Avistamientos'), findsOneWidget);
-      expect(find.text('Los avistamientos no están conectados al servidor.'), findsOneWidget);
+      expect(
+        find.text('Los avistamientos no están conectados al servidor.'),
+        findsOneWidget,
+      );
 
       // El cambio solicitado habilita los datos basicos para usuario_general.
       final tarjetaAgregar = find.text('Agregar otro animalito');
@@ -816,7 +821,23 @@ void main() {
       expect(find.text('Incidencias activas'), findsOneWidget);
       expect(find.text('Próximas vacunas'), findsOneWidget);
       expect(find.text('Reevaluaciones'), findsOneWidget);
-      expect(find.text('Próximamente'), findsOneWidget);
+      // Verifica que Reevaluaciones esté habilitado
+      // y abra correctamente su nueva pantalla.
+      final tarjetaReevaluaciones = find.byKey(
+        const ValueKey('tarjeta_pa_reevaluaciones'),
+      );
+
+      await tester.ensureVisible(tarjetaReevaluaciones);
+      await tester.tap(tarjetaReevaluaciones);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PantallaReevaluacionesComportamiento), findsOneWidget);
+
+      expect(find.text('Reevaluación'), findsOneWidget);
+
+      // Regresa a Inicio para continuar las pruebas.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(find.text('Animales por completar'), findsOneWidget);
 
       await tester.ensureVisible(tarjetaAgregar);
@@ -1044,7 +1065,9 @@ void main() {
       await tester.tap(find.text('Incidencia reportada en FIE'));
       await tester.pumpAndSettle();
 
-      expect(proveedorNotificaciones.marcadasIndividualmente, <String>['noti-1']);
+      expect(proveedorNotificaciones.marcadasIndividualmente, <String>[
+        'noti-1',
+      ]);
       expect(
         find.descendant(of: botonCampana, matching: find.text('2')),
         findsOneWidget,

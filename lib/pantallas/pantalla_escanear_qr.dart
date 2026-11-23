@@ -348,7 +348,9 @@ class _EstadoPantallaEscanearQr extends State<PantallaEscanearQr>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No fue posible cambiar de cámara en este dispositivo.'),
+          content: Text(
+            'No fue posible cambiar de cámara en este dispositivo.',
+          ),
         ),
       );
     }
@@ -418,7 +420,7 @@ class _EstadoPantallaEscanearQr extends State<PantallaEscanearQr>
           _leyendoImagen = false;
           _mensajeErrorLectura = codigos.isEmpty
               ? 'No se encontró un código QR legible en la imagen. '
-                  'Selecciona otra donde aparezca completo y nítido.'
+                    'Selecciona otra donde aparezca completo y nítido.'
               : 'La imagen no contiene un código QR válido de Patitas ESPOCH.';
         });
         return;
@@ -477,10 +479,7 @@ class _EstadoPantallaEscanearQr extends State<PantallaEscanearQr>
 
   /// Procesa el identificador ingresado manualmente para pruebas tecnicas.
   Future<void> _procesarIngresoManualPrueba() async {
-    if (_leyendoImagen ||
-        _consultandoAnimal ||
-        _enRutaHaciaFicha ||
-        !mounted) {
+    if (_leyendoImagen || _consultandoAnimal || _enRutaHaciaFicha || !mounted) {
       return;
     }
     FocusScope.of(context).unfocus();
@@ -802,7 +801,8 @@ class _EstadoPantallaEscanearQr extends State<PantallaEscanearQr>
   }
 
   Widget _construirBotonLeerImagen() {
-    final ocupado = _leyendoImagen ||
+    final ocupado =
+        _leyendoImagen ||
         _iniciandoCamara ||
         _consultandoAnimal ||
         _enRutaHaciaFicha;
@@ -843,7 +843,8 @@ class _EstadoPantallaEscanearQr extends State<PantallaEscanearQr>
   }
 
   Widget _construirControlesCirculares() {
-    final ocupado = _leyendoImagen ||
+    final ocupado =
+        _leyendoImagen ||
         _iniciandoCamara ||
         _consultandoAnimal ||
         _enRutaHaciaFicha;
@@ -1004,7 +1005,9 @@ class _EstadoPantallaEscanearQr extends State<PantallaEscanearQr>
               fillColor: ColoresAnimalesPatitas.crema,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: ColoresAnimalesPatitas.borde),
+                borderSide: const BorderSide(
+                  color: ColoresAnimalesPatitas.borde,
+                ),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
