@@ -17,6 +17,9 @@ import 'pantalla_proximas_vacunas.dart';
 import '../servicios/servicio_notificaciones.dart';
 
 //fin notificacion push
+import '../componentes/contadores_perfil.dart';
+import 'pantalla_mis_avistamientos.dart';
+
 /// Pantalla principal autenticada de Patitas ESPOCH.
 /// Consulta el perfil y rol del usuario desde el servidor antes de habilitar la navegacion:
 /// - Mientras consulta, no muestra modulos ni barra de navegacion.
@@ -917,67 +920,209 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
   }
 
   /// Vista dedicada de Perfil dentro de la barra de navegacion inferior.
+  /// Vista dedicada del perfil institucional del usuario.
   Widget _construirVistaPerfilUsuario(PerfilUsuarioModelo perfil) {
+    final fechaRegistro = perfil.fechaRegistro?.toLocal();
+
+    const meses = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+
+    final fechaRegistroVisible = fechaRegistro == null
+        ? 'No disponible'
+        : '${fechaRegistro.day} de '
+              '${meses[fechaRegistro.month - 1]} de '
+              '${fechaRegistro.year}';
+
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
+        const Text(
+          'Mi perfil',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: TemaPatitas.colorMarronOscuro,
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // TARJETA PRINCIPAL DEL USUARIO
         TarjetaFormularioPatitas(
           mostrarHojasDecorativas: false,
           hijo: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD4F0E0),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 32,
+              Center(
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFD4F0E0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    size: 60,
+                    color: TemaPatitas.colorVerdeEsmeralda,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              Text(
+                perfil.nombreCompletoVisible,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: TemaPatitas.colorMarronOscuro,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                perfil.correo,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: TemaPatitas.colorTextoSecundario,
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4F0E0),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Text(
+                    perfil.rol.etiquetaVisible,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       color: TemaPatitas.colorVerdeEsmeralda,
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          perfil.nombreCompletoVisible,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: TemaPatitas.colorMarronOscuro,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          perfil.correo,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: TemaPatitas.colorTextoSecundario,
-                          ),
-                        ),
-                      ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    perfil.activo
+                        ? Icons.verified_user_outlined
+                        : Icons.block_outlined,
+                    size: 18,
+                    color: perfil.activo
+                        ? TemaPatitas.colorVerdeEsmeralda
+                        : Colors.red,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    perfil.activo ? 'Cuenta activa' : 'Cuenta inactiva',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: perfil.activo
+                          ? TemaPatitas.colorVerdeEsmeralda
+                          : Colors.red,
                     ),
                   ),
                 ],
               ),
-              const Divider(height: 28),
-              _construirFilaDetallePerfil(
-                'Rol institucional activo:',
-                perfil.rol.etiquetaVisible,
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        if (_indicePestana == 3) ...[
+          ContadoresPerfil(
+            key: ValueKey(perfil.idUsuario),
+            idUsuario: perfil.idUsuario,
+          ),
+
+          const SizedBox(height: 16),
+        ],
+
+        // INFORMACION INSTITUCIONAL
+        TarjetaFormularioPatitas(
+          mostrarHojasDecorativas: false,
+          hijo: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Información institucional',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: TemaPatitas.colorMarronOscuro,
+                ),
               ),
+
+              const SizedBox(height: 18),
+
+              _construirFilaDetallePerfil(
+                'Miembro desde:',
+                fechaRegistroVisible,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ACTIVIDAD DEL USUARIO
+        TarjetaFormularioPatitas(
+          mostrarHojasDecorativas: false,
+          hijo: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Mi actividad',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: TemaPatitas.colorMarronOscuro,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PantallaMisAvistamientos(perfil: perfil),
+                  ),
+                ),
+                icon: const Icon(Icons.location_on_outlined),
+                label: const Text('Mis avistamientos'),
+              ),
+
               const SizedBox(height: 10),
-              _construirFilaDetallePerfil(
-                'Permisos del rol:',
-                perfil.rol.resumenPermisos,
-              ),
-              const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -987,40 +1132,47 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
                     ),
                   ),
                 ),
-                icon: const Icon(Icons.assignment_outlined),
-                label: const Text('Mis reportes'),
+                icon: const Icon(Icons.pets_rounded),
+                label: const Text('Mis animales registrados'),
               ),
+
               const SizedBox(height: 10),
+
               OutlinedButton.icon(
                 key: const ValueKey('boton_perfil_incidencias'),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => PantallaGestionIncidencias(perfil: perfil),
+                    builder: (_) => PantallaGestionIncidencias(
+                      perfil: perfil,
+                      soloPropias: true,
+                    ),
                   ),
                 ),
                 icon: const Icon(Icons.medical_services_outlined),
-                label: Text(
-                  perfil.rol.puedeGestionarEstadoIncidencias
-                      ? 'Incidencias del campus'
-                      : 'Mis incidencias',
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                style: estiloBotonSecundarioVerde(),
-                onPressed: _cargandoPerfil ? null : _cargarPerfilUsuario,
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                label: const Text('Actualizar perfil y rol'),
-              ),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                style: estiloBotonPrimarioNaranja(),
-                onPressed: _cerrandoSesion ? null : _confirmarCierreSesion,
-                icon: const Icon(Icons.logout_rounded, size: 20),
-                label: const Text('Cerrar sesión'),
+                label: const Text('Mis incidencias'),
               ),
             ],
           ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ACTUALIZACION DEL PERFIL Y ROL
+        OutlinedButton.icon(
+          style: estiloBotonSecundarioVerde(),
+          onPressed: _cargandoPerfil ? null : _cargarPerfilUsuario,
+          icon: const Icon(Icons.refresh_rounded, size: 20),
+          label: const Text('Actualizar perfil y rol'),
+        ),
+
+        const SizedBox(height: 10),
+
+        // CIERRE DE SESION
+        FilledButton.icon(
+          style: estiloBotonPrimarioNaranja(),
+          onPressed: _cerrandoSesion ? null : _confirmarCierreSesion,
+          icon: const Icon(Icons.logout_rounded, size: 20),
+          label: const Text('Cerrar sesión'),
         ),
       ],
     );

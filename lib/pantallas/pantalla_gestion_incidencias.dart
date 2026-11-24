@@ -6,6 +6,7 @@ import '../modelos/perfil_usuario_modelo.dart';
 import '../servicios/servicio_incidencias.dart';
 import '../tema/tema_patitas.dart';
 import 'pantalla_registro_incidencia.dart';
+import '../servicios/servicio_perfil_usuario.dart';
 
 /// Pantalla de consulta, seguimiento y gestión de estados de incidencias (RF-16).
 /// - Usuario general: consulta únicamente sus incidencias reportadas y su historial.
@@ -15,12 +16,14 @@ class PantallaGestionIncidencias extends StatefulWidget {
   final PerfilUsuarioModelo perfil;
   final EstadoIncidencia? filtroEstadoInicial;
   final bool soloActivasInicial;
+  final bool soloPropias;
 
   const PantallaGestionIncidencias({
     super.key,
     required this.perfil,
     this.filtroEstadoInicial,
     this.soloActivasInicial = false,
+    this.soloPropias = false,
   });
 
   @override
@@ -41,7 +44,9 @@ class _PantallaGestionIncidenciasEstado
   bool get _cuentaActiva => widget.perfil.activo;
 
   bool get _puedeGestionarEstados =>
-      _cuentaActiva && widget.perfil.rol.puedeGestionarEstadoIncidencias;
+      _cuentaActiva &&
+      !widget.soloPropias &&
+      widget.perfil.rol.puedeGestionarEstadoIncidencias;
 
   @override
   void initState() {
@@ -76,7 +81,11 @@ class _PantallaGestionIncidenciasEstado
     });
 
     try {
-      final lista = await ServicioIncidencias.proveedor.listar();
+      final lista = widget.soloPropias
+          ? await ServicioPerfilUsuario.obtenerMisIncidencias(
+              widget.perfil.idUsuario,
+            )
+          : await ServicioIncidencias.proveedor.listar();
       if (!mounted || consultaActual != _idConsulta) return;
       setState(() {
         _incidencias = lista;
