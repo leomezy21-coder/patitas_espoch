@@ -19,6 +19,9 @@ import '../servicios/servicio_notificaciones.dart';
 //fin notificacion push
 import '../componentes/contadores_perfil.dart';
 import 'pantalla_mis_avistamientos.dart';
+import '../modelos/catalogo_avatares.dart';
+import '../servicios/servicio_avatares.dart';
+import 'pantalla_seleccionar_avatar.dart';
 
 /// Pantalla principal autenticada de Patitas ESPOCH.
 /// Consulta el perfil y rol del usuario desde el servidor antes de habilitar la navegacion:
@@ -42,7 +45,12 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
   bool _cargandoPerfil = true;
   bool _moduloIncidenciasAbiertoPorNotificacion = false;
   ResultadoConsultaPerfil? _resultadoPerfil;
-
+  // Estado del avatar personalizado.
+  int _avatarId = CatalogoAvatares.avatarPredeterminado;
+  bool _cargandoAvatar = true;
+  bool _errorAvatar = false;
+  bool _abriendoSelectorAvatar = false;
+  int _versionCargaAvatar = 0;
   StreamSubscription<AvisoPushIncidencia>? _suscripcionPrimerPlano;
   StreamSubscription<AvisoPushIncidencia>? _suscripcionApertura;
 
@@ -116,6 +124,10 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
   Future<void> _cargarPerfilUsuario() async {
     setState(() {
       _cargandoPerfil = true;
+      _avatarId = CatalogoAvatares.avatarPredeterminado;
+      _cargandoAvatar = true;
+      _errorAvatar = false;
+      _versionCargaAvatar++;
     });
 
     final resultado = await ServicioAutenticacion.obtenerPerfilUsuarioActual();
@@ -139,6 +151,102 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
     final perfil = resultado.perfil;
     if (perfil != null && perfil.activo) {
       unawaited(ServicioNotificaciones.vincularDispositivoConPerfil(perfil));
+
+      unawaited(_cargarAvatarUsuario(perfil.idUsuario));
+    }
+  }
+
+  /// Recupera el avatar personalizado del usuario.
+  Future<void> _cargarAvatarUsuario(String idUsuario) async {
+    if (!mounted) return;
+
+    final version = ++_versionCargaAvatar;
+
+    setState(() {
+      _cargandoAvatar = true;
+      _errorAvatar = false;
+    });
+
+    try {
+      final avatar = await ServicioAvatares.obtenerMiAvatar();
+
+      if (!mounted ||
+          version != _versionCargaAvatar ||
+          _resultadoPerfil?.perfil?.idUsuario != idUsuario) {
+        return;
+      }
+
+      setState(() {
+        _avatarId = avatar;
+        _cargandoAvatar = false;
+        _errorAvatar = false;
+      });
+    } catch (error) {
+      if (!mounted ||
+          version != _versionCargaAvatar ||
+          _resultadoPerfil?.perfil?.idUsuario != idUsuario) {
+        return;
+      }
+
+      setState(() {
+        _cargandoAvatar = false;
+        _errorAvatar = true;
+      });
+
+      debugPrint('Error al cargar el avatar: $error');
+    }
+  }
+
+  /// Abre la pantalla de selección de avatares.
+  Future<void> _abrirSelectorAvatar() async {
+    if (!mounted ||
+        _cargandoAvatar ||
+        _errorAvatar ||
+        _abriendoSelectorAvatar ||
+        _cerrandoSesion ||
+        _cargandoPerfil ||
+        !ServicioAutenticacion.tieneSesionActiva) {
+      return;
+    }
+
+    final perfil = _resultadoPerfil?.perfil;
+
+    if (perfil == null || !perfil.activo) return;
+
+    _abriendoSelectorAvatar = true;
+
+    try {
+      final avatarGuardado = await Navigator.of(context).push<int>(
+        MaterialPageRoute<int>(
+          builder: (_) => PantallaSeleccionarAvatar(avatarActual: _avatarId),
+        ),
+      );
+
+      if (!mounted ||
+          avatarGuardado == null ||
+          _cerrandoSesion ||
+          _cargandoPerfil ||
+          _resultadoPerfil?.perfil?.idUsuario != perfil.idUsuario ||
+          !ServicioAutenticacion.tieneSesionActiva) {
+        return;
+      }
+
+      if (!CatalogoAvatares.esValido(avatarGuardado)) {
+        return;
+      }
+
+      setState(() {
+        _avatarId = avatarGuardado;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Avatar actualizado correctamente.'),
+          backgroundColor: TemaPatitas.colorVerdeEsmeralda,
+        ),
+      );
+    } finally {
+      _abriendoSelectorAvatar = false;
     }
   }
 
@@ -840,6 +948,7 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
     final vistas = <Widget>[
       VistaInicioComunidad(
         perfil: perfil,
+        avatarId: _avatarId,
         alAbrirCatalogo: () {
           setState(() {
             _indicePestana = 1;
@@ -919,6 +1028,105 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
     return destinos;
   }
 
+  /// Construye el avatar del usuario con su botón de edición.
+  Widget _construirAvatarPerfil(PerfilUsuarioModelo perfil) {
+    final ruta = CatalogoAvatares.obtenerRuta(_avatarId);
+
+    const avatarPredeterminado = CircleAvatar(
+      radius: 50,
+      backgroundColor: Color(0xFFD4F0E0),
+      child: Icon(
+        Icons.person_rounded,
+        size: 60,
+        color: TemaPatitas.colorVerdeEsmeralda,
+      ),
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 116,
+          height: 116,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Avatar del usuario.
+              ruta == null
+                  ? avatarPredeterminado
+                  : ClipOval(
+                      child: Image.asset(
+                        ruta,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return avatarPredeterminado;
+                        },
+                      ),
+                    ),
+
+              // Botón para cambiar el avatar.
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Material(
+                  color: const Color(0xFFF89028),
+                  shape: CircleBorder(
+                    side: BorderSide(
+                      color: TemaPatitas.colorSuperficie,
+                      width: 3,
+                    ),
+                  ),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: IconButton(
+                      tooltip: _errorAvatar
+                          ? 'Reintentar cargar avatar'
+                          : 'Cambiar avatar',
+                      padding: EdgeInsets.zero,
+                      onPressed: _cargandoAvatar
+                          ? null
+                          : _errorAvatar
+                          ? () => _cargarAvatarUsuario(perfil.idUsuario)
+                          : _abrirSelectorAvatar,
+                      icon: _cargandoAvatar
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(
+                              _errorAvatar
+                                  ? Icons.refresh_rounded
+                                  : Icons.edit_rounded,
+                              size: 21,
+                              color: Colors.white,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        if (_errorAvatar) ...[
+          const SizedBox(height: 6),
+          const Text(
+            'No se pudo cargar el avatar. Reintenta.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Color(0xFFE14B4B)),
+          ),
+        ],
+      ],
+    );
+  }
+
   /// Vista dedicada de Perfil dentro de la barra de navegacion inferior.
   /// Vista dedicada del perfil institucional del usuario.
   Widget _construirVistaPerfilUsuario(PerfilUsuarioModelo perfil) {
@@ -965,21 +1173,7 @@ class _PantallaPrincipalGeneralEstado extends State<PantallaPrincipalGeneral> {
           hijo: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFD4F0E0),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    size: 60,
-                    color: TemaPatitas.colorVerdeEsmeralda,
-                  ),
-                ),
-              ),
+              Center(child: _construirAvatarPerfil(perfil)),
 
               const SizedBox(height: 16),
 

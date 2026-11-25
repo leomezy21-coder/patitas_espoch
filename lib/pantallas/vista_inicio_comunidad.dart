@@ -6,6 +6,7 @@ import '../componentes/componentes_autenticacion_patitas.dart';
 import '../modelos/animal_modelo.dart';
 import '../modelos/incidencia_modelo.dart';
 import '../modelos/perfil_usuario_modelo.dart';
+import '../modelos/catalogo_avatares.dart';
 import '../servicios/servicio_animales.dart';
 import '../servicios/servicio_incidencias.dart';
 import '../tema/tema_patitas.dart';
@@ -37,6 +38,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 ///   existen, respetando que el administrador no realiza validaciones clinicas.
 class VistaInicioComunidad extends StatelessWidget {
   final PerfilUsuarioModelo perfil;
+  final int avatarId;
   final VoidCallback alAbrirCatalogo;
   final VoidCallback alAbrirMapa;
   final VoidCallback alAbrirPerfilYRol;
@@ -45,6 +47,7 @@ class VistaInicioComunidad extends StatelessWidget {
   const VistaInicioComunidad({
     super.key,
     required this.perfil,
+    this.avatarId = CatalogoAvatares.avatarPredeterminado,
     required this.alAbrirCatalogo,
     required this.alAbrirMapa,
     required this.alAbrirPerfilYRol,
@@ -173,6 +176,8 @@ class VistaInicioComunidad extends StatelessWidget {
         ? 'Personal autorizado'
         : 'Bienvenido a Patitas ESPOCH';
 
+    final rutaAvatar = CatalogoAvatares.obtenerRuta(avatarId);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -183,18 +188,39 @@ class VistaInicioComunidad extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: const Color(0xFFD4F0E0),
+              color: rutaAvatar == null
+                  ? const Color(0xFFD4F0E0)
+                  : Colors.transparent,
               shape: BoxShape.circle,
               border: Border.all(
                 color: TemaPatitas.colorVerdeEsmeralda.withValues(alpha: 0.25),
                 width: 1.5,
               ),
             ),
-            child: const Icon(
-              Icons.person_rounded,
-              size: 30,
-              color: TemaPatitas.colorVerdeEsmeralda,
-            ),
+            child: rutaAvatar == null
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 30,
+                    color: TemaPatitas.colorVerdeEsmeralda,
+                  )
+                : ClipOval(
+                    child: Image.asset(
+                      rutaAvatar,
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const ColoredBox(
+                          color: Color(0xFFD4F0E0),
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 30,
+                            color: TemaPatitas.colorVerdeEsmeralda,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ),
         const SizedBox(width: 12),
