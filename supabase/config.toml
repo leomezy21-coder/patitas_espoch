@@ -430,3 +430,6 @@ enabled = true
 
 [functions.notificar-incidencia-fcm]
 verify_jwt = false
+
+[functions.notificar-incidencia-telegram]
+verify_jwt = false
