@@ -41,7 +41,9 @@ class _PantallaProximasVacunasState extends State<PantallaProximasVacunas> {
   EstadoProximaVacuna? _estadoSeleccionado;
 
   bool get _autorizado =>
-      widget.perfil.activo && widget.perfil.rol.puedeValidarSalud;
+      widget.perfil.activo &&
+      (widget.perfil.rol == RolUsuario.personalAutorizado ||
+          widget.perfil.rol == RolUsuario.administrador);
 
   DateTime get _fechaReferencia =>
       (widget.obtenerFechaActual ?? DateTime.now)();
@@ -211,7 +213,7 @@ class _PantallaProximasVacunasState extends State<PantallaProximasVacunas> {
               Text(
                 !widget.perfil.activo
                     ? 'Tu cuenta institucional está inactiva.'
-                    : 'Solo el personal autorizado con cuenta activa puede consultar y gestionar la programación de vacunas.',
+                    : 'Solo el personal autorizado y el administrador con cuenta activa pueden consultar el listado de próximas vacunas.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,

@@ -605,17 +605,14 @@ class _PanelInicioPersonalAutorizadoEstado
     });
 
     try {
-      final registros = await Supabase.instance.client
-          .from('reevaluaciones_comportamiento')
-          .select('id_reevaluacion')
-          .inFilter('estado', ['pendiente', 'en_revision']);
+      final totalAbiertas = await _contarReevaluacionesAbiertasReales();
 
       if (!mounted || consultaActual != _idConsultaReevaluaciones) {
         return;
       }
 
       setState(() {
-        _reevaluacionesAbiertas = registros.length;
+        _reevaluacionesAbiertas = totalAbiertas;
         _cargandoReevaluaciones = false;
       });
     } catch (error) {
@@ -715,63 +712,13 @@ class _PanelInicioPersonalAutorizadoEstado
     }
   }
 
-  Future<List<ResumenReevaluacion>> _cargarReevaluacionesReales() async {
-    final registros = await Supabase.instance.client
-        .from('reevaluaciones_comportamiento')
-        .select(
-          'id_reevaluacion, id_animal, estado, '
-          'fecha_registro, observaciones',
-        )
-        .order('fecha_registro', ascending: false);
-
-    if (registros.isEmpty) {
-      return [];
-    }
-
-    final animales = await ServicioAnimales.proveedor.listar();
-
-    final animalesPorId = {for (final animal in animales) animal.id: animal};
-
-    return registros.map((registro) {
-      final idAnimal = registro['id_animal'].toString();
-      final animal = animalesPorId[idAnimal];
-
-      final estado = switch (registro['estado']) {
-        'pendiente' => EstadoReevaluacion.pendiente,
-        'en_revision' => EstadoReevaluacion.enRevision,
-        'resuelto' => EstadoReevaluacion.resuelto,
-        _ => throw const FormatException('Estado de reevaluación desconocido.'),
-      };
-
-      final fecha = DateTime.parse(registro['fecha_registro'].toString());
-
-      final observacion = registro['observaciones']?.toString().trim() ?? '';
-
-      return ResumenReevaluacion(
-        id: registro['id_reevaluacion'].toString(),
-        idAnimal: idAnimal,
-        nombreAnimal: animal?.nombre ?? 'Animal comunitario',
-        especie: animal?.especie ?? 'Otros',
-        zona: (animal?.zonaHabitual.trim().isNotEmpty ?? false)
-            ? animal!.zonaHabitual
-            : 'Sin sector registrado',
-        fecha: fecha,
-        estado: estado,
-        motivo: observacion.isNotEmpty
-            ? observacion
-            : 'Solicitud originada por una incidencia de comportamiento.',
-        urlFotografia: animal?.urlFotografia,
-      );
-    }).toList();
-  }
-
   Future<void> _abrirReevaluaciones() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => PantallaReevaluacionesComportamiento(
           perfil: widget.perfil,
           modoDemostracion: false,
-          cargarReevaluaciones: _cargarReevaluacionesReales,
+          cargarReevaluaciones: _cargarListaReevaluacionesReales,
         ),
       ),
     );
@@ -1122,21 +1069,85 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
   bool _cargandoIncidencias = false;
   int _idConsultaIncidencias = 0;
 
+  int? _fichasPendientes;
+  int? _proximasVacunas;
+  bool _cargandoAnimales = false;
+  int _idConsultaAnimales = 0;
+
+  int? _reevaluacionesAbiertas;
+  bool _cargandoReevaluaciones = false;
+  int _idConsultaReevaluaciones = 0;
+
   @override
   void initState() {
     super.initState();
     _cargarIncidenciasActivas();
+    _cargarAnimales();
+    _cargarContadorReevaluaciones();
     ServicioIncidencias.cambios.addListener(_alCambiarIncidencias);
+    ServicioAnimales.cambios.addListener(_alCambiarAnimales);
   }
 
   @override
   void dispose() {
     ServicioIncidencias.cambios.removeListener(_alCambiarIncidencias);
+    ServicioAnimales.cambios.removeListener(_alCambiarAnimales);
     super.dispose();
   }
 
   void _alCambiarIncidencias() {
     _cargarIncidenciasActivas();
+    _cargarContadorReevaluaciones();
+  }
+
+  void _alCambiarAnimales() {
+    _cargarAnimales();
+  }
+
+  Future<void> _cargarContadorReevaluaciones() async {
+    final consultaActual = ++_idConsultaReevaluaciones;
+    setState(() {
+      _cargandoReevaluaciones = true;
+    });
+    try {
+      final totalAbiertas = await _contarReevaluacionesAbiertasReales();
+      if (!mounted || consultaActual != _idConsultaReevaluaciones) return;
+      setState(() {
+        _reevaluacionesAbiertas = totalAbiertas;
+        _cargandoReevaluaciones = false;
+      });
+    } catch (_) {
+      if (!mounted || consultaActual != _idConsultaReevaluaciones) return;
+      setState(() {
+        _reevaluacionesAbiertas = null;
+        _cargandoReevaluaciones = false;
+      });
+    }
+  }
+
+  Future<void> _cargarAnimales() async {
+    final consultaActual = ++_idConsultaAnimales;
+    setState(() {
+      _cargandoAnimales = true;
+    });
+    try {
+      final lista = await ServicioAnimales.proveedor.listar();
+      if (!mounted || consultaActual != _idConsultaAnimales) return;
+      setState(() {
+        _fichasPendientes = lista
+            .where(VistaCatalogoAnimales.esRegistroPendienteRevisionAdministrativa)
+            .length;
+        _proximasVacunas = DosisVacunaPendiente.extraerDeAnimales(lista).length;
+        _cargandoAnimales = false;
+      });
+    } catch (_) {
+      if (!mounted || consultaActual != _idConsultaAnimales) return;
+      setState(() {
+        _fichasPendientes = null;
+        _proximasVacunas = null;
+        _cargandoAnimales = false;
+      });
+    }
   }
 
   Future<void> _cargarIncidenciasActivas() async {
@@ -1160,8 +1171,8 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
     }
   }
 
-  void _abrirRevisionAnimales(BuildContext context) {
-    Navigator.of(context).push<void>(
+  Future<void> _abrirRevisionAnimales(BuildContext context) async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => PantallaReportesAnimales(
           perfil: widget.perfil,
@@ -1169,6 +1180,9 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
         ),
       ),
     );
+    if (mounted) {
+      _cargarAnimales();
+    }
   }
 
   Future<void> _abrirGestionIncidencias(BuildContext context) async {
@@ -1182,6 +1196,32 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
     );
     if (mounted) {
       _cargarIncidenciasActivas();
+    }
+  }
+
+  Future<void> _abrirProximasVacunas(BuildContext context) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PantallaProximasVacunas(perfil: widget.perfil),
+      ),
+    );
+    if (mounted) {
+      _cargarAnimales();
+    }
+  }
+
+  Future<void> _abrirReevaluaciones(BuildContext context) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PantallaReevaluacionesComportamiento(
+          perfil: widget.perfil,
+          modoDemostracion: false,
+          cargarReevaluaciones: _cargarListaReevaluacionesReales,
+        ),
+      ),
+    );
+    if (mounted) {
+      _cargarContadorReevaluaciones();
     }
   }
 
@@ -1410,6 +1450,8 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
             icono: Icons.assignment_turned_in_outlined,
             colorFondoIcono: const Color(0xFFFBE29D),
             colorIcono: const Color(0xFF4E2509),
+            contadorReal: _fichasPendientes,
+            cargando: _cargandoAnimales,
             habilitada: true,
             permitirCrecimientoVertical: true,
             alPresionar: () => _abrirRevisionAnimales(context),
@@ -1429,28 +1471,32 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
             alPresionar: () => _abrirGestionIncidencias(context),
           ),
           const SizedBox(height: 10),
-          const _TarjetaResumenPersonalAutorizado(
-            key: ValueKey('tarjeta_admin_proximas_vacunas'),
+          _TarjetaResumenPersonalAutorizado(
+            key: const ValueKey('tarjeta_admin_proximas_vacunas'),
             titulo: 'Próximas vacunas',
             subtitulo: 'Vacunaciones por realizar',
             icono: Icons.vaccines_outlined,
-            colorFondoIcono: Color(0xFFCBEBCB),
-            colorIcono: Color(0xFF4E2509),
-            habilitada: false,
+            colorFondoIcono: const Color(0xFFCBEBCB),
+            colorIcono: const Color(0xFF4E2509),
+            contadorReal: _proximasVacunas,
+            cargando: _cargandoAnimales,
+            habilitada: true,
             permitirCrecimientoVertical: true,
-            etiquetaDeshabilitada: 'Próximamente',
+            alPresionar: () => _abrirProximasVacunas(context),
           ),
           const SizedBox(height: 10),
-          const _TarjetaResumenPersonalAutorizado(
-            key: ValueKey('tarjeta_admin_reevaluaciones'),
+          _TarjetaResumenPersonalAutorizado(
+            key: const ValueKey('tarjeta_admin_reevaluaciones'),
             titulo: 'Reevaluaciones',
             subtitulo: 'Comportamiento por revisar',
             icono: Icons.pets_rounded,
-            colorFondoIcono: Color(0xFFFAD0A2),
-            colorIcono: Color(0xFF4E2509),
-            habilitada: false,
+            colorFondoIcono: const Color(0xFFFAD0A2),
+            colorIcono: const Color(0xFF4E2509),
+            contadorReal: _reevaluacionesAbiertas,
+            cargando: _cargandoReevaluaciones,
+            habilitada: true,
             permitirCrecimientoVertical: true,
-            etiquetaDeshabilitada: 'Próximamente',
+            alPresionar: () => _abrirReevaluaciones(context),
           ),
         ],
       ),
@@ -1566,8 +1612,6 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
 }
 
 /// Tarjeta horizontal reutilizada en los paneles de `personal_autorizado` y `administrador`.
-/// Cuando [habilitada] es `false`, muestra la insignia [etiquetaDeshabilitada] ("Proximamente")
-/// sin inventar contadores ni permitir navegacion simulada.
 class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
   final String titulo;
   final String subtitulo;
@@ -1580,7 +1624,6 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
   final bool cargando;
   final bool habilitada;
   final bool permitirCrecimientoVertical;
-  final String? etiquetaDeshabilitada;
   final VoidCallback? alPresionar;
 
   const _TarjetaResumenPersonalAutorizado({
@@ -1594,164 +1637,105 @@ class _TarjetaResumenPersonalAutorizado extends StatelessWidget {
     this.cargando = false,
     required this.habilitada,
     this.permitirCrecimientoVertical = false,
-    this.etiquetaDeshabilitada,
     this.alPresionar,
   });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (contexto, limites) {
-        final mostrarInsigniaEnColumna =
-            !habilitada &&
-            etiquetaDeshabilitada != null &&
-            permitirCrecimientoVertical &&
-            limites.maxWidth < 390;
-
-        return Opacity(
-          opacity: habilitada ? 1.0 : 0.78,
-          child: Material(
-            color: colorFondoTarjeta,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: colorBorde, width: 1.4),
+    return Opacity(
+      opacity: habilitada ? 1.0 : 0.78,
+      child: Material(
+        color: colorFondoTarjeta,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: colorBorde, width: 1.4),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: habilitada ? alPresionar : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
             ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: habilitada ? alPresionar : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
+            child: Row(
+              children: [
+                Container(
+                  width: 48.0,
+                  height: 48.0,
+                  decoration: BoxDecoration(
+                    color: colorFondoIcono,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icono, color: colorIcono, size: 26.0),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48.0,
-                      height: 48.0,
-                      decoration: BoxDecoration(
-                        color: colorFondoIcono,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(icono, color: colorIcono, size: 26.0),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            titulo,
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w900,
-                              color: TemaPatitas.colorMarronOscuro,
-                              height: 1.18,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            subtitulo,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: TemaPatitas.colorTextoSecundario,
-                              height: 1.25,
-                            ),
-                          ),
-                          if (mostrarInsigniaEnColumna) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3E8DA),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                etiquetaDeshabilitada!,
-                                softWrap: false,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: TemaPatitas.colorMarronMedio,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (!mostrarInsigniaEnColumna) ...[
-                      const SizedBox(width: 8),
-                      if (!habilitada && etiquetaDeshabilitada != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3E8DA),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            etiquetaDeshabilitada!,
-                            softWrap: false,
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: TemaPatitas.colorMarronMedio,
-                            ),
-                          ),
-                        )
-                      else ...[
-                        if (cargando && contadorReal == null)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 10),
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        else if (contadorReal != null)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: Text(
-                              '${contadorReal!}',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0A4D8C),
-                              ),
-                            ),
-                          ),
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF9E5CC),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.chevron_right_rounded,
-                            size: 20,
-                            color: Color(0xFF4E2509),
-                          ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titulo,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                          color: TemaPatitas.colorMarronOscuro,
+                          height: 1.18,
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitulo,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: TemaPatitas.colorTextoSecundario,
+                          height: 1.25,
+                        ),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                if (cargando && contadorReal == null)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else if (contadorReal != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Text(
+                      '${contadorReal!}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0A4D8C),
+                      ),
+                    ),
+                  ),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF9E5CC),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF4E2509),
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -1949,4 +1933,62 @@ class _BotonAccesoRapidoInicio extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Cuenta las reevaluaciones de comportamiento en estado pendiente o en revisión.
+Future<int> _contarReevaluacionesAbiertasReales() async {
+  final registros = await Supabase.instance.client
+      .from('reevaluaciones_comportamiento')
+      .select('id_reevaluacion')
+      .inFilter('estado', ['pendiente', 'en_revision']);
+  return registros.length;
+}
+
+/// Carga desde Supabase las reevaluaciones de comportamiento enriquecidas con datos del animal.
+Future<List<ResumenReevaluacion>> _cargarListaReevaluacionesReales() async {
+  final registros = await Supabase.instance.client
+      .from('reevaluaciones_comportamiento')
+      .select(
+        'id_reevaluacion, id_animal, estado, '
+        'fecha_registro, observaciones',
+      )
+      .order('fecha_registro', ascending: false);
+
+  if (registros.isEmpty) {
+    return [];
+  }
+
+  final animales = await ServicioAnimales.proveedor.listar();
+  final animalesPorId = {for (final animal in animales) animal.id: animal};
+
+  return registros.map((registro) {
+    final idAnimal = registro['id_animal'].toString();
+    final animal = animalesPorId[idAnimal];
+
+    final estado = switch (registro['estado']) {
+      'pendiente' => EstadoReevaluacion.pendiente,
+      'en_revision' => EstadoReevaluacion.enRevision,
+      'resuelto' => EstadoReevaluacion.resuelto,
+      _ => throw const FormatException('Estado de reevaluación desconocido.'),
+    };
+
+    final fecha = DateTime.parse(registro['fecha_registro'].toString());
+    final observacion = registro['observaciones']?.toString().trim() ?? '';
+
+    return ResumenReevaluacion(
+      id: registro['id_reevaluacion'].toString(),
+      idAnimal: idAnimal,
+      nombreAnimal: animal?.nombre ?? 'Animal comunitario',
+      especie: animal?.especie ?? 'Otros',
+      zona: (animal?.zonaHabitual.trim().isNotEmpty ?? false)
+          ? animal!.zonaHabitual
+          : 'Sin sector registrado',
+      fecha: fecha,
+      estado: estado,
+      motivo: observacion.isNotEmpty
+          ? observacion
+          : 'Solicitud originada por una incidencia de comportamiento.',
+      urlFotografia: animal?.urlFotografia,
+    );
+  }).toList();
 }

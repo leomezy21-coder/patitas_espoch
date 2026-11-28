@@ -20,6 +20,7 @@ import 'package:patitas_espoch/pantallas/pantalla_registro_animal.dart';
 
 import 'soporte/proveedor_animales_memoria.dart';
 
+import 'package:patitas_espoch/pantallas/pantalla_proximas_vacunas.dart';
 import 'package:patitas_espoch/pantallas/pantalla_reevaluaciones_comportamiento.dart';
 
 /// Doble de prueba para simular notificaciones en memoria durante las pruebas de widgets.
@@ -882,8 +883,72 @@ void main() {
       expect(find.text('Incidencias activas'), findsOneWidget);
       expect(find.text('Próximas vacunas'), findsOneWidget);
       expect(find.text('Reevaluaciones'), findsOneWidget);
-      // 2 accesos pendientes: próximas vacunas y reevaluaciones.
-      expect(find.text('Próximamente'), findsNWidgets(2));
+      expect(find.text('Próximamente'), findsNothing);
+
+      final tarjetaVacunas = find.byKey(
+        const ValueKey('tarjeta_admin_proximas_vacunas'),
+      );
+      expect(tarjetaVacunas, findsOneWidget);
+      expect(
+        tester
+            .widget<InkWell>(
+              find.descendant(
+                of: tarjetaVacunas,
+                matching: find.byType(InkWell),
+              ),
+            )
+            .onTap,
+        isNotNull,
+      );
+
+      await tester.ensureVisible(tarjetaVacunas);
+      await tester.tap(tarjetaVacunas);
+      await tester.pumpAndSettle();
+      expect(find.byType(PantallaProximasVacunas), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('proximas_vacunas_no_autorizado')),
+        findsNothing,
+      );
+      final hayEstadoVacioVacunas = find
+          .text('No hay vacunas programadas por el momento.')
+          .evaluate()
+          .isNotEmpty;
+      final hayTarjetasVacunas = find
+          .byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key! as ValueKey<String>).value.startsWith(
+                  'tarjeta_proxima_vacuna_',
+                ),
+          )
+          .evaluate()
+          .isNotEmpty;
+      expect(hayEstadoVacioVacunas || hayTarjetasVacunas, isTrue);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      final tarjetaReevaluacionesAdmin = find.byKey(
+        const ValueKey('tarjeta_admin_reevaluaciones'),
+      );
+      expect(tarjetaReevaluacionesAdmin, findsOneWidget);
+      expect(
+        tester
+            .widget<InkWell>(
+              find.descendant(
+                of: tarjetaReevaluacionesAdmin,
+                matching: find.byType(InkWell),
+              ),
+            )
+            .onTap,
+        isNotNull,
+      );
+
+      await tester.ensureVisible(tarjetaReevaluacionesAdmin);
+      await tester.tap(tarjetaReevaluacionesAdmin);
+      await tester.pumpAndSettle();
+      expect(find.byType(PantallaReevaluacionesComportamiento), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
     },
   );
 
