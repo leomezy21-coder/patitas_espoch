@@ -1069,9 +1069,10 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
   bool _cargandoIncidencias = false;
   int _idConsultaIncidencias = 0;
 
+  int? _fichasPendientes;
   int? _proximasVacunas;
-  bool _cargandoProximasVacunas = false;
-  int _idConsultaProximasVacunas = 0;
+  bool _cargandoAnimales = false;
+  int _idConsultaAnimales = 0;
 
   int? _reevaluacionesAbiertas;
   bool _cargandoReevaluaciones = false;
@@ -1081,7 +1082,7 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
   void initState() {
     super.initState();
     _cargarIncidenciasActivas();
-    _cargarProximasVacunas();
+    _cargarAnimales();
     _cargarContadorReevaluaciones();
     ServicioIncidencias.cambios.addListener(_alCambiarIncidencias);
     ServicioAnimales.cambios.addListener(_alCambiarAnimales);
@@ -1100,7 +1101,7 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
   }
 
   void _alCambiarAnimales() {
-    _cargarProximasVacunas();
+    _cargarAnimales();
   }
 
   Future<void> _cargarContadorReevaluaciones() async {
@@ -1124,23 +1125,27 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
     }
   }
 
-  Future<void> _cargarProximasVacunas() async {
-    final consultaActual = ++_idConsultaProximasVacunas;
+  Future<void> _cargarAnimales() async {
+    final consultaActual = ++_idConsultaAnimales;
     setState(() {
-      _cargandoProximasVacunas = true;
+      _cargandoAnimales = true;
     });
     try {
       final lista = await ServicioAnimales.proveedor.listar();
-      if (!mounted || consultaActual != _idConsultaProximasVacunas) return;
+      if (!mounted || consultaActual != _idConsultaAnimales) return;
       setState(() {
+        _fichasPendientes = lista
+            .where(VistaCatalogoAnimales.esRegistroPendienteRevisionAdministrativa)
+            .length;
         _proximasVacunas = DosisVacunaPendiente.extraerDeAnimales(lista).length;
-        _cargandoProximasVacunas = false;
+        _cargandoAnimales = false;
       });
     } catch (_) {
-      if (!mounted || consultaActual != _idConsultaProximasVacunas) return;
+      if (!mounted || consultaActual != _idConsultaAnimales) return;
       setState(() {
+        _fichasPendientes = null;
         _proximasVacunas = null;
-        _cargandoProximasVacunas = false;
+        _cargandoAnimales = false;
       });
     }
   }
@@ -1166,8 +1171,8 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
     }
   }
 
-  void _abrirRevisionAnimales(BuildContext context) {
-    Navigator.of(context).push<void>(
+  Future<void> _abrirRevisionAnimales(BuildContext context) async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => PantallaReportesAnimales(
           perfil: widget.perfil,
@@ -1175,6 +1180,9 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
         ),
       ),
     );
+    if (mounted) {
+      _cargarAnimales();
+    }
   }
 
   Future<void> _abrirGestionIncidencias(BuildContext context) async {
@@ -1198,7 +1206,7 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
       ),
     );
     if (mounted) {
-      _cargarProximasVacunas();
+      _cargarAnimales();
     }
   }
 
@@ -1442,6 +1450,8 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
             icono: Icons.assignment_turned_in_outlined,
             colorFondoIcono: const Color(0xFFFBE29D),
             colorIcono: const Color(0xFF4E2509),
+            contadorReal: _fichasPendientes,
+            cargando: _cargandoAnimales,
             habilitada: true,
             permitirCrecimientoVertical: true,
             alPresionar: () => _abrirRevisionAnimales(context),
@@ -1469,7 +1479,7 @@ class _PanelInicioAdministradorEstado extends State<_PanelInicioAdministrador> {
             colorFondoIcono: const Color(0xFFCBEBCB),
             colorIcono: const Color(0xFF4E2509),
             contadorReal: _proximasVacunas,
-            cargando: _cargandoProximasVacunas,
+            cargando: _cargandoAnimales,
             habilitada: true,
             permitirCrecimientoVertical: true,
             alPresionar: () => _abrirProximasVacunas(context),
